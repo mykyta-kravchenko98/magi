@@ -31,7 +31,7 @@ The slice must preserve the intended modular-monolith and DDD boundaries. It is 
 - configurable maximum upload size;
 - durable storage of the original file in MinIO;
 - deterministic parsing into a minimal document structure, normalization, and structure-aware chunking;
-- `Qwen/Qwen3-Embedding-4B` served locally over HTTP by Hugging Face Text Embeddings Inference (TEI);
+- `Qwen/Qwen3-Embedding-0.6B` served locally over HTTP by Hugging Face Text Embeddings Inference (TEI);
 - embedding batching, request timeout, and vector-dimension validation;
 - one Qdrant collection with deterministic point identifiers and idempotent upsert;
 - persisted processing status exposed through HTTP;
@@ -269,7 +269,7 @@ Ports are narrow, typed contracts owned by the application module that consumes 
 
 Normalization and chunking are deterministic in-process services, not infrastructure adapters. The minimal node types are `Heading`, `Paragraph`, and `CodeBlock`. Nodes carry text and optional source locations; headings carry a level and code blocks may carry a language. A chunk carries its active `heading_path`, content type, and the inclusive page range covering its source text when that information exists. External DTOs from the PDF library, MinIO, TEI, and Qdrant are translated at adapter boundaries.
 
-Every outbound network adapter has an explicit timeout. The embedding adapter verifies the pinned model revision, vector count, finite numeric values, and dimension `2560`. The Qdrant adapter uses a deterministic point ID derived from `document_version_id` and `chunk_index`.
+Every outbound network adapter has an explicit timeout. The embedding adapter verifies the pinned model revision, vector count, finite numeric values, and dimension `1024`. The Qdrant adapter uses a deterministic point ID derived from `document_version_id` and `chunk_index`.
 
 ## Chunking profile v1
 
@@ -299,15 +299,15 @@ The text sent for document embedding is the chunk text prefixed by its non-empty
 
 ```text
 server: Hugging Face Text Embeddings Inference
-model_id: Qwen/Qwen3-Embedding-4B
+model_id: Qwen/Qwen3-Embedding-0.6B
 model_revision: pinned immutable revision
 tokenizer_revision: same pinned model revision
-vector_dimension: 2560
+vector_dimension: 1024
 distance: Cosine
 document_instruction: none
 ```
 
-The full 2560-dimensional output is used in the walking skeleton. Dimension reduction, alternate models, and model migration are deferred. A future retrieval query may use a fixed retrieval instruction, but indexed document chunks do not receive a query instruction.
+The full 1024-dimensional output is used in the walking skeleton. The 0.6B model preserves GPU capacity for a co-resident assistant LLM; moving to the 4B model is a future quality upgrade that requires retrieval evaluation, a new embedding profile, and complete reindexing. Dimension reduction, other alternate models, and live model migration are deferred. A future retrieval query may use a fixed retrieval instruction, but indexed document chunks do not receive a query instruction.
 
 ## Qdrant point contract
 
@@ -332,7 +332,7 @@ Each point contains one embedding and a payload sufficient to prove indexability
 
 `content_type` is `text`, `code`, or `mixed`. `page_start` and `page_end` are present for PDF chunks and absent for text formats. Preserving structure and provenance now enables later citations and filtering without changing the indexed chunk identity.
 
-The Qdrant collection uses 2560-dimensional vectors and Cosine distance. The collection name and immutable embedding/chunking profile identifiers are fixed in configuration.
+The Qdrant collection uses 1024-dimensional vectors and Cosine distance. The collection name and immutable embedding/chunking profile identifiers are fixed in configuration.
 
 ## Definition of Done
 
@@ -345,7 +345,7 @@ The walking skeleton is done when all of the following are true:
 5. The original bytes and media type are present in MinIO after upload.
 6. PDF parsing preserves page order and page provenance; Markdown parsing preserves headings and fenced code blocks.
 7. Structure-aware chunking is deterministic, respects natural boundaries, applies overlap only to split prose, and does not split an in-limit code block.
-8. Embeddings are produced by pinned `Qwen/Qwen3-Embedding-4B` through local TEI and validated as 2560-dimensional finite vectors before indexing.
+8. Embeddings are produced by pinned `Qwen/Qwen3-Embedding-0.6B` through local TEI and validated as 1024-dimensional finite vectors before indexing.
 9. All expected chunks are present in a Cosine Qdrant collection with deterministic IDs and the documented payload.
 10. The version becomes `SEARCHABLE` only after the complete Qdrant upsert succeeds.
 11. The addition status endpoint exposes `COMPLETED` or a persisted, sanitized `FAILED` result.

@@ -11,6 +11,6 @@ ADR statuses used here are `Proposed`, `Accepted`, `Superseded`, and `Rejected`.
 | [0005](0005-upload-api-contract.md) | Upload and status API contract | Accepted |
 | [0006](0006-text-based-pdf-and-source-provenance.md) | Text-based PDF support and source provenance | Accepted |
 | [0007](0007-structure-aware-chunking.md) | Minimal document structure and structure-aware chunking | Accepted |
-| [0008](0008-qwen3-embedding-4b.md) | Qwen3-Embedding-4B embedding profile | Accepted |
+| [0008](0008-qwen3-embedding-0.6b.md) | Temporary Qwen3-Embedding-0.6B embedding profile | Accepted |
 
 The normative scope and Definition of Done are in [Walking Skeleton: Data Upload Pipeline](../walking-skeleton-scope.md).

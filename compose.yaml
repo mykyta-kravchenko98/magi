@@ -1,0 +1,44 @@
+name: magi
+
+services:
+  tei:
+    profiles: [gpu]
+    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.9.3
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    init: true
+    restart: unless-stopped
+    command:
+      - --model-id
+      - Qwen/Qwen3-Embedding-0.6B
+      - --revision
+      - 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+      - --dtype
+      - float16
+      - --max-client-batch-size
+      - "16"
+      - --max-batch-tokens
+      - "8192"
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - tei-model-cache:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --show-error, http://localhost:80/health]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30m
+    stop_grace_period: 30s
+
+volumes:
+  tei-model-cache:
+
