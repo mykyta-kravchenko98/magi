@@ -1,0 +1,81 @@
+name: Python
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.32"
+          enable-cache: true
+      - name: Install Python
+        run: uv python install 3.13
+      - name: Install locked dependencies
+        run: uv sync --locked --all-groups
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Pyright
+        run: uv run pyright
+      - name: Tests
+        run: uv run pytest
+      - name: Build package
+        run: uv build --no-sources
+
+  migrations:
+    name: Migrations (${{ matrix.context }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        context: [documents, ingestion, retrieval]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: magi
+          POSTGRES_USER: magi
+          POSTGRES_PASSWORD: magi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U magi -d magi"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      MAGI_DATABASE_URL: postgresql+asyncpg://magi:magi@localhost:5432/magi
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.32"
+          enable-cache: true
+      - name: Install Python
+        run: uv python install 3.13
+      - name: Install locked dependencies
+        run: uv sync --locked --no-dev
+      - name: Upgrade context from an empty database
+        run: uv run alembic -n ${{ matrix.context }} upgrade head
+      - name: Downgrade and upgrade context
+        run: |
+          uv run alembic -n ${{ matrix.context }} downgrade base
+          uv run alembic -n ${{ matrix.context }} upgrade head
