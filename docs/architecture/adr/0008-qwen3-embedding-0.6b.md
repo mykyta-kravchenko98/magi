@@ -1,6 +1,6 @@
 # ADR 0008: Temporary Qwen3-Embedding-0.6B embedding profile
 
-- Status: Amended
+- Status: Accepted
 - Date: 2026-08-13
 
 ## Context
@@ -15,14 +15,14 @@ Use the following immutable embedding profile for the first Qdrant projection:
 profile_id = qwen3-embedding-0.6b-v1
 server = Hugging Face Text Embeddings Inference
 model_id = Qwen/Qwen3-Embedding-0.6B
-model_revision = to be pinned before durable indexing
+model_revision = 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
 tokenizer_revision = model_revision
 vector_dimension = 1024
 distance = Cosine
 document_instruction = none
 ```
 
-For the current implementation, use the 0.6B model's full 1024-dimensional output rather than Matryoshka truncation. This is a temporary GPU-capacity tradeoff, not a finding that 0.6B matches the retrieval quality of 4B. Pin the exact model revision in configuration before creating a durable projection and record the profile ID with that projection. The application talks to TEI through `EmbeddingProvider`; it does not import PyTorch, Transformers, CUDA, or model-specific runtime code.
+Use the 0.6B model's full 1024-dimensional output rather than Matryoshka truncation. This is a GPU-capacity tradeoff, not a finding that 0.6B matches the retrieval quality of 4B. Pin the exact model revision in configuration and record the profile ID with its projection. The application talks to TEI through `EmbeddingProvider`; it does not import PyTorch, Transformers, CUDA, or model-specific runtime code.
 
 For document embeddings, prefix non-empty `heading_path` values to the normalized chunk content but do not apply a query instruction. The future retrieval slice may define and version a fixed query instruction separately.
 
@@ -48,3 +48,4 @@ The adapter rejects a response with the wrong model identity or revision when ex
 - Reduced vector dimensions: rejected until retrieval evaluation demonstrates an acceptable quality/storage tradeoff.
 - Load the model inside the FastAPI process: rejected because it couples application deployment to CUDA and model runtime libraries.
 - Select a model per request: rejected because the walking skeleton has one immutable projection profile.
+

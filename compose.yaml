@@ -3,7 +3,7 @@ name: magi
 services:
   tei:
     profiles: [gpu]
-    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.9
+    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.9.3
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -12,6 +12,8 @@ services:
     command:
       - --model-id
       - Qwen/Qwen3-Embedding-0.6B
+      - --revision
+      - 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
       - --dtype
       - float16
       - --max-client-batch-size

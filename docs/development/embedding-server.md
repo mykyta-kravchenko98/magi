@@ -8,10 +8,10 @@ not start with a plain `docker compose up`.
 
 | Setting | Value |
 |---|---|
-| TEI image | `ghcr.io/huggingface/text-embeddings-inference:cuda-1.9` |
+| TEI image | `ghcr.io/huggingface/text-embeddings-inference:cuda-1.9.3` |
 | CUDA target | compute capability 8.9 (Ada Lovelace / RTX 4000) |
 | Model | `Qwen/Qwen3-Embedding-0.6B` |
-| Model revision | image-resolved model revision (not yet pinned) |
+| Model revision | `97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3` |
 | Data type | `float16` |
 | Embedding dimension | `1024` |
 | Host endpoint | `http://127.0.0.1:8081` |
@@ -21,9 +21,9 @@ for an assistant LLM. The 4B model remains a future quality upgrade after retrie
 evaluation and GPU-budget testing. Moving between these models requires a new embedding
 profile and a complete reindex because their default vector dimensions differ.
 
-The TEI minor release is pinned, but the 0.6B model revision is not pinned yet. Pin it
-before treating an index as reproducible or durable. The `tei-model-cache` named volume
-stores downloaded model artifacts across container recreation.
+The TEI patch release and model revision are pinned so container recreation does not
+silently change the embedding profile. The `tei-model-cache` named volume stores
+downloaded model artifacts across container recreation.
 
 ## Host preparation (Windows and WSL2)
 
@@ -44,6 +44,11 @@ stores downloaded model artifacts across container recreation.
 The CUDA toolkit is not required in the WSL distribution merely to run the prebuilt TEI
 container. The container carries its CUDA runtime; the host still needs a compatible
 Windows NVIDIA driver.
+
+The local RTX 4080 setup was verified with the NVIDIA 596 driver branch. The 610 branch
+caused TEI compatibility problems on that machine and was rolled back. Treat this as a
+tested local baseline, not as a universal upper bound; re-run the GPU and embedding smoke
+tests before adopting a different driver branch.
 
 ## Verify GPU passthrough
 
