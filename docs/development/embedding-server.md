@@ -8,17 +8,22 @@ not start with a plain `docker compose up`.
 
 | Setting | Value |
 |---|---|
-| TEI image | `ghcr.io/huggingface/text-embeddings-inference:89-1.9.3` |
+| TEI image | `ghcr.io/huggingface/text-embeddings-inference:cuda-1.9` |
 | CUDA target | compute capability 8.9 (Ada Lovelace / RTX 4000) |
-| Model | `Qwen/Qwen3-Embedding-4B` |
-| Model revision | `5cf2132abc99cad020ac570b19d031efec650f2b` |
+| Model | `Qwen/Qwen3-Embedding-0.6B` |
+| Model revision | image-resolved model revision (not yet pinned) |
 | Data type | `float16` |
-| Embedding dimension | `2560` |
-| Host endpoint | `http://127.0.0.1:8080` |
+| Embedding dimension | `1024` |
+| Host endpoint | `http://127.0.0.1:8081` |
 
-The exact TEI patch version and Hugging Face commit are pinned; neither an image
-`latest` tag nor the model's mutable `main` revision is used. The `tei-model-cache`
-named volume stores downloaded model artifacts across container recreation.
+The initial runtime uses the 0.6B model to preserve enough of the RTX 4080's 16 GB VRAM
+for an assistant LLM. The 4B model remains a future quality upgrade after retrieval
+evaluation and GPU-budget testing. Moving between these models requires a new embedding
+profile and a complete reindex because their default vector dimensions differ.
+
+The TEI minor release is pinned, but the 0.6B model revision is not pinned yet. Pin it
+before treating an index as reproducible or durable. The `tei-model-cache` named volume
+stores downloaded model artifacts across container recreation.
 
 ## Host preparation (Windows and WSL2)
 
@@ -70,7 +75,7 @@ docker compose --profile gpu up --detach --wait tei
 docker compose --profile gpu ps
 ```
 
-The first start downloads roughly 8 GB of model artifacts and can take several minutes.
+The first start downloads the model artifacts and can take several minutes.
 The Compose healthcheck has a long startup allowance for that initial download and calls
 TEI's inference-aware `/health` endpoint. Follow startup progress with:
 
@@ -78,7 +83,7 @@ TEI's inference-aware `/health` endpoint. Follow startup progress with:
 docker compose --profile gpu logs --follow tei
 ```
 
-Only loopback port `8080` is published, so the unauthenticated development endpoint is not
+Only loopback port `8081` is published, so the unauthenticated development endpoint is not
 exposed to the local network.
 
 ## Verify the HTTP endpoints
@@ -86,8 +91,8 @@ exposed to the local network.
 Check readiness and the loaded-model metadata:
 
 ```bash
-curl --fail --silent --show-error http://127.0.0.1:8080/health
-curl --fail --silent --show-error http://127.0.0.1:8080/info
+curl --fail --silent --show-error http://127.0.0.1:8081/health
+curl --fail --silent --show-error http://127.0.0.1:8081/info
 ```
 
 Run the checked-in smoke test:
@@ -96,11 +101,11 @@ Run the checked-in smoke test:
 bash scripts/smoke-embedding.sh
 ```
 
-The script sends a real `/embed` request, requires exactly one 2560-dimensional vector,
+The script sends a real `/embed` request, requires exactly one 1024-dimensional vector,
 and rejects non-numeric values such as `NaN` or infinity. A successful run prints:
 
 ```text
-Smoke test passed: endpoint=http://127.0.0.1:8080/embed dimension=2560
+Smoke test passed: endpoint=http://127.0.0.1:8081/embed dimension=1024
 ```
 
 For diagnostics, a raw request is:
@@ -109,7 +114,7 @@ For diagnostics, a raw request is:
 curl --fail-with-body --silent --show-error \
   --header 'Content-Type: application/json' \
   --data '{"inputs":"Magi embedding endpoint check"}' \
-  http://127.0.0.1:8080/embed
+  http://127.0.0.1:8081/embed
 ```
 
 ## Stop and preserve the model cache
@@ -124,7 +129,8 @@ download should be deleted deliberately.
 ## References
 
 - [TEI supported models and GPU images](https://github.com/huggingface/text-embeddings-inference#docker-images)
-- [Qwen3-Embedding-4B model](https://huggingface.co/Qwen/Qwen3-Embedding-4B)
+- [Qwen3-Embedding-0.6B model](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B)
+- [Qwen3-Embedding-4B model (deferred upgrade)](https://huggingface.co/Qwen/Qwen3-Embedding-4B)
 - [Docker Compose GPU reservations](https://docs.docker.com/compose/how-tos/gpu-support/)
 - [NVIDIA CUDA on WSL guide](https://docs.nvidia.com/cuda/wsl-user-guide/)
 

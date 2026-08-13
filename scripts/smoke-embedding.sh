@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
-endpoint="${TEI_ENDPOINT:-http://127.0.0.1:8080}"
-expected_dimension="${EXPECTED_EMBEDDING_DIMENSION:-2560}"
+endpoint="${TEI_ENDPOINT:-http://127.0.0.1:8081}"
+expected_dimension="${EXPECTED_EMBEDDING_DIMENSION:-1024}"
 
 response="$(
   curl \
@@ -36,9 +36,9 @@ printf '%s\n' "${response}" | awk \
     }
 
     number = "^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$"
-    for (index = 1; index <= dimension; index++) {
-      if (values[index] !~ number) {
-        printf "Smoke test failed: vector element %d is not finite JSON number\n", index > "/dev/stderr"
+    for (i = 1; i <= dimension; i++) {
+      if (values[i] !~ number) {
+        printf "Smoke test failed: vector element %d is not finite JSON number\n", i > "/dev/stderr"
         exit 1
       }
     }
