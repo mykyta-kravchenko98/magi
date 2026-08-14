@@ -24,6 +24,15 @@ uv run alembic -n retrieval upgrade head
 `docker compose up` runs the three histories through a one-shot `migrations` service
 before starting the API.
 
+The documents migration history seeds one active knowledge base for the walking skeleton:
+
+```text
+Name: Technical Literature
+ID:   c87d83a0-eac5-4a2c-9b7d-31fbdce39f51
+```
+
+It is deployment seed data, not a content-deduplication or knowledge-base management API.
+
 Configuration uses `MAGI_`-prefixed environment variables; copy `.env.example` to
 `.env` for local overrides. The default database URL targets PostgreSQL on
 `localhost:5432`.
@@ -51,5 +60,6 @@ dependencies are assembled only in `magi.bootstrap`.
 The current architectural target is the data-upload walking skeleton. See:
 
 - [Walking skeleton scope](docs/architecture/walking-skeleton-scope.md)
+- [Documents domain model](docs/architecture/documents-domain-model.md)
 - [Architecture Decision Records](docs/architecture/adr/README.md)
 - [Local embedding server on RTX 4080](docs/development/embedding-server.md)

@@ -6,7 +6,8 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from magi.documents.infrastructure.persistence.base import DOCUMENTS_SCHEMA, DocumentsBase
+from magi.documents.infrastructure.persistence.base import DOCUMENTS_SCHEMA
+from magi.documents.infrastructure.persistence.models import MODEL_METADATA
 from magi.shared.config import get_settings
 
 config = context.config
@@ -15,7 +16,7 @@ config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%"
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = DocumentsBase.metadata
+target_metadata = MODEL_METADATA
 VERSION_TABLE = "alembic_version_documents"
 
 

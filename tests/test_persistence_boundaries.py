@@ -8,7 +8,7 @@ from magi.ingestion.infrastructure.persistence.base import IngestionBase
 from magi.retrieval.infrastructure.persistence.base import RetrievalBase
 
 EXPECTED_HEADS = {
-    "documents": "documents_0001",
+    "documents": "documents_0006",
     "ingestion": "ingestion_0001",
     "retrieval": "retrieval_0001",
 }
