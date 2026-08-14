@@ -79,3 +79,18 @@ jobs:
         run: |
           uv run alembic -n ${{ matrix.context }} downgrade base
           uv run alembic -n ${{ matrix.context }} upgrade head
+
+  required:
+    name: Backend CI
+    if: always()
+    needs: [quality, migrations]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify required jobs
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          MIGRATIONS_RESULT: ${{ needs.migrations.result }}
+        run: |
+          test "$QUALITY_RESULT" = "success"
+          test "$MIGRATIONS_RESULT" = "success"
