@@ -28,6 +28,41 @@ class Settings(BaseSettings):
     object_storage_timeout_seconds: float = Field(default=10.0, gt=0)
 
 
+class EmbeddingSettings(BaseSettings):
+    """Required environment configuration for the embedding adapter."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="MAGI_EMBEDDING_",
+        extra="ignore",
+    )
+
+    base_url: str
+    model_id: str
+    model_revision: str
+    vector_dimension: int = Field(ge=1)
+    batch_size: int = Field(ge=1)
+    timeout_seconds: float = Field(gt=0)
+    api_key: SecretStr | None = None
+
+
+class QdrantSettings(BaseSettings):
+    """Required environment configuration for the Qdrant adapter."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="MAGI_QDRANT_",
+        extra="ignore",
+    )
+
+    url: str
+    collection: str
+    vector_dimension: int = Field(ge=1)
+    batch_size: int = Field(ge=1)
+    timeout_seconds: float = Field(gt=0)
+    api_key: SecretStr | None = None
+
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()

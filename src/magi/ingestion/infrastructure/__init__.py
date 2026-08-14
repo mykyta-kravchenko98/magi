@@ -1,5 +1,6 @@
 """Ingestion adapters."""
 
+from magi.ingestion.infrastructure.embedding import TeiEmbeddingConfig, TeiEmbeddingProvider
 from magi.ingestion.infrastructure.parsers import (
     DocumentParserRegistry,
     MarkdownParser,
@@ -13,5 +14,7 @@ __all__ = [
     "MarkdownParser",
     "PdfExtractionProfile",
     "PdfParser",
+    "TeiEmbeddingConfig",
+    "TeiEmbeddingProvider",
     "TxtParser",
 ]

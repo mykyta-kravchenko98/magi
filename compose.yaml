@@ -12,6 +12,17 @@ services:
       MAGI_OBJECT_STORAGE_SECRET_KEY: magi-minio-secret
       MAGI_OBJECT_STORAGE_BUCKET: magi-sources
       MAGI_OBJECT_STORAGE_SECURE: "false"
+      MAGI_EMBEDDING_BASE_URL: http://tei:80
+      MAGI_EMBEDDING_MODEL_ID: Qwen/Qwen3-Embedding-0.6B
+      MAGI_EMBEDDING_MODEL_REVISION: 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+      MAGI_EMBEDDING_VECTOR_DIMENSION: "1024"
+      MAGI_EMBEDDING_BATCH_SIZE: "16"
+      MAGI_EMBEDDING_TIMEOUT_SECONDS: "30"
+      MAGI_QDRANT_URL: http://qdrant:6333
+      MAGI_QDRANT_COLLECTION: magi_chunks_v1
+      MAGI_QDRANT_VECTOR_DIMENSION: "1024"
+      MAGI_QDRANT_BATCH_SIZE: "64"
+      MAGI_QDRANT_TIMEOUT_SECONDS: "10"
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -66,6 +77,13 @@ services:
       timeout: 3s
       retries: 10
 
+  qdrant:
+    image: qdrant/qdrant:v1.18.3
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
   tei:
     profiles: [gpu]
     image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.9.3
@@ -107,5 +125,6 @@ services:
 volumes:
   postgres-data:
   minio-data:
+  qdrant-data:
   tei-model-cache:
 
