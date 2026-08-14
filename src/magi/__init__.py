@@ -1,0 +1,1 @@
+"""Magi modular-monolith application."""

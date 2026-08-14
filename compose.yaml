@@ -1,6 +1,49 @@
 name: magi
 
 services:
+  api:
+    build: .
+    environment:
+      MAGI_DATABASE_URL: postgresql+asyncpg://magi:magi@postgres:5432/magi
+      MAGI_DOCS_ENABLED: "true"
+      MAGI_ENVIRONMENT: development
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  migrations:
+    build: .
+    command: [magi-migrate]
+    environment:
+      MAGI_DATABASE_URL: postgresql+asyncpg://magi:magi@postgres:5432/magi
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: magi
+      POSTGRES_USER: magi
+      POSTGRES_PASSWORD: magi
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U magi -d magi]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   tei:
     profiles: [gpu]
     image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.9.3
@@ -40,5 +83,6 @@ services:
     stop_grace_period: 30s
 
 volumes:
+  postgres-data:
   tei-model-cache:
 
