@@ -63,3 +63,4 @@ The current architectural target is the data-upload walking skeleton. See:
 - [Documents domain model](docs/architecture/documents-domain-model.md)
 - [Architecture Decision Records](docs/architecture/adr/README.md)
 - [Local embedding server on RTX 4080](docs/development/embedding-server.md)
+- [Persistence adapter integration tests](docs/development/persistence-integration-tests.md)

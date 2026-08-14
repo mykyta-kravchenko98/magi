@@ -4,6 +4,7 @@ from uuid import UUID
 from magi.documents.application import (
     DocumentAdditionRepository,
     DocumentRepository,
+    DocumentVersionRepository,
     KnowledgeBaseRepository,
     ObjectStorage,
     UnitOfWork,
@@ -25,23 +26,32 @@ class FakeAdditions:
         del addition_id
         return None
 
+    async def save(self, addition: DocumentAddition) -> None:
+        del addition
+
 
 class FakeDocuments:
     async def add(self, document: Document) -> None:
         del document
 
-    async def add_version(self, version: DocumentVersion) -> None:
+
+class FakeDocumentVersions:
+    async def add(self, version: DocumentVersion) -> None:
         del version
 
-    async def get_version(self, version_id: UUID) -> DocumentVersion | None:
+    async def get(self, version_id: UUID) -> DocumentVersion | None:
         del version_id
         return None
+
+    async def save(self, version: DocumentVersion) -> None:
+        del version
 
 
 class FakeUnitOfWork:
     knowledge_bases: KnowledgeBaseRepository = FakeKnowledgeBases()
     document_additions: DocumentAdditionRepository = FakeAdditions()
     documents: DocumentRepository = FakeDocuments()
+    document_versions: DocumentVersionRepository = FakeDocumentVersions()
 
     async def __aenter__(self) -> "FakeUnitOfWork":
         return self
@@ -74,7 +84,7 @@ class FakeObjectStorage:
         return object_key
 
 
-def test_fakes_satisfy_structural_application_ports() -> None:
+def test_fakes_satisfy_structural_application_interfaces() -> None:
     unit_of_work: UnitOfWork = FakeUnitOfWork()
     object_storage: ObjectStorage = FakeObjectStorage()
 

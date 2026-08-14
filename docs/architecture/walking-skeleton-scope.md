@@ -260,7 +260,8 @@ Ports are narrow, typed contracts owned by the application module that consumes 
 |---|---|
 | `KnowledgeBaseRepository` | Load a knowledge base by ID within a unit of work |
 | `DocumentAdditionRepository` | Add and load an addition; persist lifecycle changes |
-| `DocumentRepository` | Add a document and version; persist version lifecycle changes |
+| `DocumentRepository` | Add a document |
+| `DocumentVersionRepository` | Add and load a version; persist version lifecycle changes |
 | `UnitOfWork` | Explicit begin/commit/rollback around PostgreSQL checkpoints |
 | `ObjectStorage` | Put immutable bytes with media type; return an opaque object reference |
 | `DocumentParser` | Convert supported bytes to an ordered `ParsedDocument` of `DocumentNode` values and source locations, or return a typed parsing failure |
