@@ -12,6 +12,7 @@ dependencies = [
     "minio>=7.2.15,<8",
     "pdfplumber>=0.11.10,<0.12",
     "pydantic-settings>=2.10,<3",
+    "python-multipart>=0.0.20,<1",
     "sqlalchemy[asyncio]>=2.0.41,<3",
     "urllib3>=2,<3",
     "uvicorn[standard]>=0.35,<1",
@@ -38,6 +39,7 @@ addopts = "-ra --strict-config --strict-markers"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
+    "e2e: requires the complete application stack",
     "integration: requires explicitly configured external services",
 ]
 

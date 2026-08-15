@@ -66,6 +66,23 @@ The slice must preserve the intended modular-monolith and DDD boundaries. It is 
 
 The upload use case belongs to `documents.application`. It coordinates the public application contracts of `ingestion` and `retrieval`; those modules do not mutate document aggregates directly.
 
+Application code is organized by responsibility rather than collected in workflow files:
+
+```text
+documents/application/commands       # immutable commands and command handlers
+documents/application/queries        # immutable queries and query handlers
+documents/application/services       # reusable application policies/helpers
+documents/application/models         # immutable application DTOs
+documents/application/errors         # application failure taxonomy
+documents/application/interfaces     # ports only
+ingestion/application/services       # text pipeline and document embedding services
+retrieval/application/services       # document-version indexing service
+```
+
+The embedding and indexing services remain in the application layer because they compose
+technology-neutral ports. TEI HTTP and Qdrant REST implementations remain infrastructure
+adapters and are supplied only by bootstrap.
+
 The cross-module application contracts are intentionally small:
 
 | Contract | Input | Output |

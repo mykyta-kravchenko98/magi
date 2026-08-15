@@ -6,14 +6,22 @@ from magi.ingestion.application.errors import (
     EmbeddingResponseInvalidError,
 )
 from magi.ingestion.application.interfaces import (
+    DocumentContentProcessor,
+    DocumentEmbedder,
     DocumentFormatParser,
     DocumentParser,
     EmbeddingProvider,
 )
-from magi.ingestion.application.text_pipeline import TextDocumentPipeline
-from magi.ingestion.application.value_objects import EmbeddingBatch, EmbeddingModelMetadata
+from magi.ingestion.application.models import EmbeddingBatch, EmbeddingModelMetadata
+from magi.ingestion.application.services import (
+    DocumentEmbeddingService,
+    TextDocumentPipeline,
+)
 
 __all__ = [
+    "DocumentContentProcessor",
+    "DocumentEmbedder",
+    "DocumentEmbeddingService",
     "DocumentFormatParser",
     "DocumentParser",
     "EmbeddingBatch",

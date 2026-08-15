@@ -16,10 +16,17 @@ from magi.documents.application.interfaces.knowledge_base_repository import (
 
 
 class UnitOfWork(Protocol):
-    knowledge_bases: KnowledgeBaseRepository
-    document_additions: DocumentAdditionRepository
-    documents: DocumentRepository
-    document_versions: DocumentVersionRepository
+    @property
+    def knowledge_bases(self) -> KnowledgeBaseRepository: ...
+
+    @property
+    def document_additions(self) -> DocumentAdditionRepository: ...
+
+    @property
+    def documents(self) -> DocumentRepository: ...
+
+    @property
+    def document_versions(self) -> DocumentVersionRepository: ...
 
     async def __aenter__(self) -> "UnitOfWork": ...
 

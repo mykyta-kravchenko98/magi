@@ -13,7 +13,7 @@ from magi.retrieval.application.errors import (
     VectorIndexUnavailableError,
     VectorPointInvalidError,
 )
-from magi.retrieval.application.value_objects import VectorPoint
+from magi.retrieval.application.models import VectorPoint
 from magi.retrieval.infrastructure.vector_index.config import QdrantVectorIndexConfig
 
 

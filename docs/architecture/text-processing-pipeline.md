@@ -85,7 +85,7 @@ Parser responsibilities are split by format:
 
 ```text
 ingestion/application/interfaces/document_parser.py   # parser ports
-ingestion/application/text_pipeline.py                # port-driven pipeline
+ingestion/application/services/text_document_pipeline.py # port-driven pipeline
 ingestion/infrastructure/parsers/txt.py                # TXT adapter
 ingestion/infrastructure/parsers/markdown.py           # Markdown adapter
 ingestion/infrastructure/parsers/pdf.py                # pdfplumber adapter

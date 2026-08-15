@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from magi.ingestion.application.value_objects import EmbeddingBatch
+from magi.ingestion.application.models import EmbeddingBatch
 
 
 class EmbeddingProvider(Protocol):

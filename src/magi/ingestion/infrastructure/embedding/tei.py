@@ -11,7 +11,7 @@ from magi.ingestion.application.errors import (
     EmbeddingProviderUnavailableError,
     EmbeddingResponseInvalidError,
 )
-from magi.ingestion.application.value_objects import EmbeddingBatch, EmbeddingModelMetadata
+from magi.ingestion.application.models import EmbeddingBatch, EmbeddingModelMetadata
 from magi.ingestion.infrastructure.embedding.config import TeiEmbeddingConfig
 
 

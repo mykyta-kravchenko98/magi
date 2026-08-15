@@ -1,4 +1,4 @@
-"""Public composition of the parse -> normalize -> chunk stages."""
+"""Application service composing parse -> normalize -> chunk stages."""
 
 from magi.ingestion.application.interfaces import DocumentParser
 from magi.ingestion.domain import (

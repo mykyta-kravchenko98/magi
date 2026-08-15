@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from magi.retrieval.application.value_objects import VectorPoint
+from magi.retrieval.application.models import VectorPoint
 
 
 class VectorIndex(Protocol):
