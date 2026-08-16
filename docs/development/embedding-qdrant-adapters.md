@@ -10,10 +10,11 @@ The walking-skeleton infrastructure has two independent asynchronous adapters:
 Neither application port depends on HTTPX, TEI, or Qdrant. The adapters translate
 transport and protocol failures to application-owned exceptions.
 
-Application values live separately from ports under `application/value_objects`, and
-application-owned failure types live under `application/errors`. Immutable TEI and
-Qdrant configuration records remain next to their infrastructure adapters in dedicated
-`config.py` modules: they have value semantics, but are not domain value objects.
+Application DTOs live separately from ports under `application/models`, application
+services under `application/services`, and application-owned failure types under
+`application/errors`. Immutable TEI and Qdrant configuration records remain next to
+their infrastructure adapters in dedicated `config.py` modules: they have value semantics,
+but are neither domain value objects nor application DTOs.
 
 ## Runtime guarantees
 

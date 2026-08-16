@@ -6,10 +6,20 @@ from magi.retrieval.application.errors import (
     VectorIndexUnavailableError,
     VectorPointInvalidError,
 )
-from magi.retrieval.application.interfaces import VectorIndex
-from magi.retrieval.application.value_objects import VectorContentType, VectorPoint
+from magi.retrieval.application.interfaces import DocumentVersionIndexer, VectorIndex
+from magi.retrieval.application.models import (
+    IndexChunk,
+    IndexedDocumentVersion,
+    VectorContentType,
+    VectorPoint,
+)
+from magi.retrieval.application.services import DocumentVersionIndexingService
 
 __all__ = [
+    "DocumentVersionIndexer",
+    "DocumentVersionIndexingService",
+    "IndexChunk",
+    "IndexedDocumentVersion",
     "VectorContentType",
     "VectorIndex",
     "VectorIndexConfigurationError",

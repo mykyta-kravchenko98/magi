@@ -10,20 +10,16 @@ from magi.documents.application.interfaces.document_version_repository import (
 from magi.documents.application.interfaces.knowledge_base_repository import (
     KnowledgeBaseRepository,
 )
-from magi.documents.application.interfaces.object_storage import (
-    ObjectAlreadyExistsError,
-    ObjectStorage,
-    ObjectStorageError,
-)
+from magi.documents.application.interfaces.object_storage import ObjectStorage
 from magi.documents.application.interfaces.unit_of_work import UnitOfWork
+from magi.documents.application.interfaces.unit_of_work_factory import UnitOfWorkFactory
 
 __all__ = [
     "DocumentAdditionRepository",
     "DocumentRepository",
     "DocumentVersionRepository",
     "KnowledgeBaseRepository",
-    "ObjectAlreadyExistsError",
     "ObjectStorage",
-    "ObjectStorageError",
     "UnitOfWork",
+    "UnitOfWorkFactory",
 ]

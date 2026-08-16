@@ -1,10 +1,9 @@
-"""Retrieval projection values."""
+"""A point ready to be written through the vector-index port."""
 
 from dataclasses import dataclass
-from typing import Literal
 from uuid import UUID
 
-type VectorContentType = Literal["text", "code", "mixed"]
+from magi.retrieval.application.models.vector_content_type import VectorContentType
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

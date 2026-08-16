@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     app_name: str = "Magi API"
     environment: str = "development"
     docs_enabled: bool = True
+    max_upload_bytes: int = Field(default=20 * 1_024 * 1_024, ge=1)
+    chunk_max_chars: int = Field(default=2_000, ge=1)
+    chunk_overlap_chars: int = Field(default=200, ge=0)
     database_url: str = Field(
         default="postgresql+asyncpg://magi:magi@localhost:5432/magi",
         repr=False,
