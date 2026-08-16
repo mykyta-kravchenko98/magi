@@ -31,13 +31,17 @@ extractable text layer produce stable pipeline errors.
 
 `PdfParser` uses `pdfplumber` word coordinates, font names, and font sizes. Its immutable
 `PdfExtractionProfile` controls line tolerance, paragraph gaps, indentation, heading thresholds,
-and recognized monospace font names.
+heading-line joining, page-furniture candidates, and recognized monospace font names.
 
 - words are grouped into lines by vertical center and sorted left-to-right;
+- bare page numbers, numbered running titles, short page ornaments, and repeated low-emphasis
+  headers/footers are removed from configurable page-edge candidates before node classification;
 - ordinary consecutive lines become paragraphs; visual gaps and new list markers create a new
   paragraph;
 - sufficiently large or bold short lines become headings, with levels derived from descending
   heading font sizes across the document;
+- adjacent same-level heading lines on one page are merged when their visual gap is within the
+  configured threshold;
 - lines dominated by configured monospace fonts become atomic code blocks; relative x-offsets
   reconstruct leading indentation approximately;
 - uncertain content remains a paragraph;
@@ -45,15 +49,21 @@ and recognized monospace font names.
 - chunks may cross pages and retain inclusive `page_start`/`page_end` provenance.
 
 The current reading-order heuristic targets ordinary single-column born-digital documents.
-Multi-column layout, tables, repeated header/footer removal, rotated text, and perfect code
+Multi-column layout, tables, rotated text, arbitrary page ornaments, and perfect code
 reconstruction require representative fixtures before expanding the extraction profile.
 
 ## Normalization
 
 Normalization is deterministic: Unicode is converted to NFC, prose whitespace is collapsed,
-and empty nodes are removed. Code indentation and internal blank lines are retained; newline
-forms and trailing whitespace are normalized. A document with no paragraph or non-empty code
-content is rejected with `NoTextContentError`.
+and empty nodes are removed. Before whitespace collapsing, PDF prose removes hyphens that occur
+at physical line breaks between letters. A known hyphenated form found elsewhere in the document,
+an uppercase abbreviation, or a hyphenated particle preserves the hyphen. This behavior applies
+only to nodes carrying PDF page provenance; TXT, Markdown, and code are unaffected.
+
+Code indentation and internal blank lines are retained; newline forms and trailing whitespace are
+normalized. A document with no paragraph or non-empty code content is rejected with
+`NoTextContentError`. Content-role classification and exclusion of table-of-contents content from
+embedding remain the next PDF-hardening slice.
 
 ## Character chunking profile
 

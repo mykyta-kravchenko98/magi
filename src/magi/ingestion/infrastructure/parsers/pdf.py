@@ -26,6 +26,11 @@ from magi.ingestion.domain import (
 )
 
 _LIST_MARKER = re.compile(r"^(?:[\u2022\u25cf\u25aa\u25e6*+-]|\d+[.)])\s+")
+_PAGE_NUMBER = re.compile(r"^\d+$")
+_NUMBERED_PAGE_FURNITURE = re.compile(r"^(?:\d+\s*\|\s*\S.*|\S.*\s*\|\s*\d+)$")
+_DECORATIVE_PAGE_FURNITURE = re.compile(r"^[^\w]+$")
+_FURNITURE_DIGITS = re.compile(r"\d+")
+_FURNITURE_WHITESPACE = re.compile(r"\s+")
 _BOLD_FONT_MARKERS = ("bold", "black", "semibold", "demi")
 
 
@@ -48,8 +53,11 @@ class PdfExtractionProfile:
     indentation_ratio: float = 1.5
     heading_size_ratio: float = 1.2
     bold_heading_size_ratio: float = 1.08
+    heading_join_gap_ratio: float = 0.75
     code_char_width_ratio: float = 0.6
     max_heading_chars: int = 200
+    page_furniture_candidate_lines: int = 2
+    page_furniture_min_repetitions: int = 2
     code_font_markers: tuple[str, ...] = (
         "courier",
         "consolas",
@@ -68,12 +76,17 @@ class PdfExtractionProfile:
             self.indentation_ratio,
             self.heading_size_ratio,
             self.bold_heading_size_ratio,
+            self.heading_join_gap_ratio,
             self.code_char_width_ratio,
         )
         if any(value <= 0 for value in positive_values):
             raise ValueError("PDF extraction ratios must be positive")
         if self.max_heading_chars < 1:
             raise ValueError("max_heading_chars must be positive")
+        if self.page_furniture_candidate_lines < 1:
+            raise ValueError("page_furniture_candidate_lines must be positive")
+        if self.page_furniture_min_repetitions < 2:
+            raise ValueError("page_furniture_min_repetitions must be at least two")
         if not self.code_font_markers:
             raise ValueError("code_font_markers must not be empty")
 
@@ -208,6 +221,72 @@ def _body_font_size(lines: Iterable[_Line]) -> float:
     return frequency.most_common(1)[0][0]
 
 
+def _page_furniture_indexes(line_count: int, candidate_lines: int) -> set[int]:
+    boundary = min(line_count, candidate_lines)
+    return {*range(boundary), *range(max(0, line_count - boundary), line_count)}
+
+
+def _canonical_page_furniture(text: str) -> str:
+    without_page_numbers = _FURNITURE_DIGITS.sub("#", text)
+    return _FURNITURE_WHITESPACE.sub(" ", without_page_numbers).strip().casefold()
+
+
+def _is_direct_page_furniture(line: _Line, line_index: int) -> bool:
+    text = line.text.strip()
+    page_number_match = _PAGE_NUMBER.fullmatch(text)
+    if (
+        page_number_match is not None and int(page_number_match.group(0)) == line.page_number
+    ) or _NUMBERED_PAGE_FURNITURE.fullmatch(text):
+        return True
+    return (
+        line_index == 0
+        and len(text) <= 4
+        and _DECORATIVE_PAGE_FURNITURE.fullmatch(text) is not None
+    )
+
+
+def _repeated_page_furniture(
+    pages: Sequence[Sequence[_Line]],
+    body_size: float,
+    profile: PdfExtractionProfile,
+) -> set[str]:
+    occurrences: Counter[str] = Counter()
+    maximum_furniture_size = body_size * profile.bold_heading_size_ratio
+    for lines in pages:
+        page_keys = {
+            _canonical_page_furniture(lines[index].text)
+            for index in _page_furniture_indexes(len(lines), profile.page_furniture_candidate_lines)
+            if lines[index].max_size <= maximum_furniture_size
+        }
+        occurrences.update(key for key in page_keys if key)
+    return {
+        key for key, count in occurrences.items() if count >= profile.page_furniture_min_repetitions
+    }
+
+
+def _remove_page_furniture(
+    pages: Sequence[Sequence[_Line]],
+    body_size: float,
+    profile: PdfExtractionProfile,
+) -> tuple[tuple[_Line, ...], ...]:
+    repeated = _repeated_page_furniture(pages, body_size, profile)
+    cleaned_pages: list[tuple[_Line, ...]] = []
+    for lines in pages:
+        candidates = _page_furniture_indexes(len(lines), profile.page_furniture_candidate_lines)
+        cleaned_pages.append(
+            tuple(
+                line
+                for index, line in enumerate(lines)
+                if index not in candidates
+                or (
+                    not _is_direct_page_furniture(line, index)
+                    and _canonical_page_furniture(line.text) not in repeated
+                )
+            )
+        )
+    return tuple(cleaned_pages)
+
+
 def _is_heading(line: _Line, body_size: float, profile: PdfExtractionProfile) -> bool:
     if _LIST_MARKER.match(line.text) or len(line.text) > profile.max_heading_chars:
         return False
@@ -253,7 +332,7 @@ def _starts_new_paragraph(
 
 def _paragraph(lines: Sequence[_Line]) -> Paragraph:
     return Paragraph(
-        text=" ".join(line.text for line in lines),
+        text="\n".join(line.text for line in lines),
         source_location=SourceLocation(page_number=lines[0].page_number),
     )
 
@@ -281,6 +360,7 @@ def _classify_page(
     nodes: list[DocumentNode] = []
     paragraph_lines: list[_Line] = []
     code_lines: list[_Line] = []
+    previous_heading_line: _Line | None = None
 
     def flush_paragraph() -> None:
         nonlocal paragraph_lines
@@ -298,14 +378,42 @@ def _classify_page(
         if _is_heading(line, body_size, profile):
             flush_paragraph()
             flush_code()
-            nodes.append(
-                Heading(
-                    level=_heading_level(line, heading_sizes),
-                    text=line.text,
-                    source_location=SourceLocation(page_number=line.page_number),
-                )
+            level = _heading_level(line, heading_sizes)
+            previous_node = nodes[-1] if nodes else None
+            gap = (
+                line.top - previous_heading_line.bottom
+                if previous_heading_line is not None
+                else float("inf")
             )
+            maximum_gap = (
+                max(body_size, previous_heading_line.height, line.height)
+                * profile.heading_join_gap_ratio
+                if previous_heading_line is not None
+                else 0.0
+            )
+            if (
+                previous_heading_line is not None
+                and isinstance(previous_node, Heading)
+                and previous_node.level == level
+                and gap <= maximum_gap
+                and len(previous_node.text) + len(line.text) + 1 <= profile.max_heading_chars
+            ):
+                nodes[-1] = Heading(
+                    level=level,
+                    text=f"{previous_node.text} {line.text}",
+                    source_location=previous_node.source_location,
+                )
+            else:
+                nodes.append(
+                    Heading(
+                        level=level,
+                        text=line.text,
+                        source_location=SourceLocation(page_number=line.page_number),
+                    )
+                )
+            previous_heading_line = line
             continue
+        previous_heading_line = None
         if line.code_ratio >= 0.8:
             flush_paragraph()
             if code_lines:
@@ -354,6 +462,11 @@ class PdfParser:
         all_lines = tuple(line for page in pages for line in page)
         if not all_lines:
             raise PdfNoExtractableTextError("PDF has no extractable text layer")
+        body_size = _body_font_size(all_lines)
+        pages = _remove_page_furniture(pages, body_size, self._profile)
+        all_lines = tuple(line for page in pages for line in page)
+        if not all_lines:
+            raise PdfNoExtractableTextError("PDF has no meaningful text")
         body_size = _body_font_size(all_lines)
         heading_sizes = _heading_sizes(all_lines, body_size, self._profile)
         nodes = tuple(

@@ -14,5 +14,6 @@ ADR statuses used here are `Proposed`, `Accepted`, `Superseded`, and `Rejected`.
 | [0008](0008-qwen3-embedding-0.6b.md) | Temporary Qwen3-Embedding-0.6B embedding profile | Accepted |
 | [0009](0009-module-owned-database-schemas-and-migrations.md) | Module-owned database schemas and migration histories | Accepted |
 | [0010](0010-pdfplumber-layout-extraction.md) | pdfplumber for conservative PDF layout extraction | Accepted |
+| [0011](0011-deterministic-pdf-normalization.md) | Deterministic PDF layout and prose normalization | Accepted |
 
 The normative scope and Definition of Done are in [Walking Skeleton: Data Upload Pipeline](../walking-skeleton-scope.md).
