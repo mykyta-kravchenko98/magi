@@ -12,14 +12,17 @@ from magi.ingestion.domain.errors import (
 )
 from magi.ingestion.domain.services import (
     DeterministicDocumentNormalizer,
+    DeterministicDocumentRoleClassifier,
     DocumentChunker,
     DocumentNormalizer,
+    DocumentRoleClassifier,
     StructureAwareCharacterChunker,
 )
 from magi.ingestion.domain.value_objects import (
     CharacterChunkingConfig,
     ChunkContentType,
     CodeBlock,
+    ContentRole,
     DocumentChunk,
     DocumentNode,
     Heading,
@@ -33,11 +36,14 @@ __all__ = [
     "ChunkContentType",
     "CodeBlock",
     "ContentBlockTooLargeError",
+    "ContentRole",
     "DeterministicDocumentNormalizer",
+    "DeterministicDocumentRoleClassifier",
     "DocumentChunk",
     "DocumentChunker",
     "DocumentNode",
     "DocumentNormalizer",
+    "DocumentRoleClassifier",
     "Heading",
     "InvalidTextEncodingError",
     "NoTextContentError",

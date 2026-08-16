@@ -3,7 +3,8 @@
 The transport- and provider-independent ingestion pipeline is implemented in `magi.ingestion`:
 
 ```text
-source bytes -> parse -> normalize -> character chunking -> DocumentChunk[]
+source bytes -> parse -> normalize -> classify roles -> select indexable nodes
+             -> character chunking -> DocumentChunk[]
 ```
 
 Domain and application code deliberately have no imports from FastAPI, Pydantic, SQLAlchemy,
@@ -35,7 +36,8 @@ heading-line joining, page-furniture candidates, and recognized monospace font n
 
 - words are grouped into lines by vertical center and sorted left-to-right;
 - bare page numbers, numbered running titles, short page ornaments, and repeated low-emphasis
-  headers/footers are removed from configurable page-edge candidates before node classification;
+  headers/footers are identified in configurable page-edge candidates and retained with the
+  `header_footer` role;
 - ordinary consecutive lines become paragraphs; visual gaps and new list markers create a new
   paragraph;
 - sufficiently large or bold short lines become headings, with levels derived from descending
@@ -62,8 +64,19 @@ only to nodes carrying PDF page provenance; TXT, Markdown, and code are unaffect
 
 Code indentation and internal blank lines are retained; newline forms and trailing whitespace are
 normalized. A document with no paragraph or non-empty code content is rejected with
-`NoTextContentError`. Content-role classification and exclusion of table-of-contents content from
-embedding remain the next PDF-hardening slice.
+`NoTextContentError`.
+
+## Content roles and indexing selection
+
+Every node carries `body`, `front_matter`, `table_of_contents`, or `header_footer`. TXT and
+Markdown nodes remain `body`. For PDF, the deterministic domain classifier recognizes explicit
+Russian and English contents headings, common front-matter headings, and numbered chapter
+headings. It does not depend on `pdfplumber` or layout DTOs.
+
+The default application policy selects `body` and `front_matter` before chunking. Contents and
+page furniture remain available in the classified structure but do not reach the embedding API or
+Qdrant. A document with no eligible nodes fails explicitly. Selected chunks carry `content_role`,
+and Qdrant stores it for later filtering and diagnostics.
 
 ## Character chunking profile
 
@@ -75,7 +88,8 @@ explicit interim profile and is not the token-aware `v1` profile described by AD
 - oversized prose is split at sentence, then word, then hard character boundaries;
 - overlap is used only between pieces of the same oversized paragraph;
 - code blocks are never split and raise `ContentBlockTooLargeError` above `max_chars`;
-- chunk indexes, content types, source spans, and output order are deterministic.
+- chunk indexes, content types, content roles, source spans, and output order are deterministic;
+- chunks never combine nodes with different content roles.
 
 Tokenizer-aware sizing remains deferred. OCR is also deferred: image-only/scanned PDFs fail with
 `PdfNoExtractableTextError`; Tesseract or another OCR engine belongs in a separate adapter and
@@ -108,11 +122,14 @@ The domain separates immutable values from stateless policies:
 ```text
 ingestion/domain/value_objects/source_location.py      # source provenance
 ingestion/domain/value_objects/document_structure.py   # parsed nodes/document
+ingestion/domain/value_objects/content_role.py         # semantic node/chunk role
 ingestion/domain/value_objects/document_chunk.py       # chunk output
 ingestion/domain/value_objects/chunking_profile.py     # immutable limits
 ingestion/domain/services/interfaces/document_normalizer.py # normalization contract
+ingestion/domain/services/interfaces/document_role_classifier.py # role contract
 ingestion/domain/services/interfaces/document_chunker.py    # chunking contract
 ingestion/domain/services/deterministic_document_normalizer.py # normalization policy
+ingestion/domain/services/deterministic_document_role_classifier.py # role policy
 ingestion/domain/services/structure_aware_chunker.py   # chunking policy
 ```
 

@@ -21,10 +21,10 @@ Normalize PDF layout in two stages while preserving the existing `DocumentParser
 The `PdfParser` adapter cleans positioned lines before classifying `DocumentNode` values:
 
 - inspect a configurable number of lines at the start and end of every page;
-- remove bare page numbers, numbered running titles such as `20 | Предисловие`, and short
-  punctuation-only page ornaments;
-- remove unnumbered margin text repeated on at least two pages when its font is not larger than
-  ordinary body text;
+- identify bare page numbers, numbered running titles such as `20 | Предисловие`, and short
+  punctuation-only page ornaments as page furniture;
+- identify unnumbered margin text repeated on at least two pages as page furniture when its font
+  is not larger than ordinary body text;
 - merge consecutive same-level heading lines on one page when their visual gap is within the
   configured heading-join threshold;
 - preserve newline boundaries inside extracted prose paragraphs for the next stage.
@@ -37,8 +37,8 @@ known hyphenated particle. Normal whitespace collapsing then removes the remaini
 breaks.
 
 Code blocks are not dehyphenated. TXT and Markdown nodes do not receive PDF-specific
-dehyphenation. Content-role classification and the table-of-contents indexing policy are separate
-decisions and are not introduced by this ADR.
+dehyphenation. Page furniture is retained and marked for the content-role indexing policy defined
+separately by ADR 0012.
 
 ## Consequences
 
@@ -53,8 +53,8 @@ decisions and are not introduced by this ADR.
   occurrence. Corpus evaluation must precede expanding the heuristics.
 - This changes parsing semantics. Existing searchable versions remain immutable; evaluation uses
   a newly uploaded document version and a complete reindex.
-- Similarity results can still be dominated by the table of contents until content roles and the
-  indexing policy are implemented.
+- The separate content-role policy decides whether identified page furniture is eligible for
+  chunking, embedding, and indexing.
 
 ## Rejected alternatives
 

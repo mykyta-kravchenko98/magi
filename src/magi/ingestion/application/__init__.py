@@ -12,7 +12,11 @@ from magi.ingestion.application.interfaces import (
     DocumentParser,
     EmbeddingProvider,
 )
-from magi.ingestion.application.models import EmbeddingBatch, EmbeddingModelMetadata
+from magi.ingestion.application.models import (
+    EmbeddingBatch,
+    EmbeddingModelMetadata,
+    IndexingContentPolicy,
+)
 from magi.ingestion.application.services import (
     DocumentEmbeddingService,
     TextDocumentPipeline,
@@ -30,5 +34,6 @@ __all__ = [
     "EmbeddingProviderError",
     "EmbeddingProviderUnavailableError",
     "EmbeddingResponseInvalidError",
+    "IndexingContentPolicy",
     "TextDocumentPipeline",
 ]

@@ -86,6 +86,7 @@ async def test_real_tei_embeddings_are_idempotently_upserted_to_qdrant() -> None
                     document_version_id=document_version_id,
                     chunk_index=index,
                     content_type="text",
+                    content_role="body",
                     heading_path=("Integration",),
                     text=text,
                     vector=vector,

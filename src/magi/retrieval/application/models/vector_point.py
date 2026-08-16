@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from magi.retrieval.application.models.vector_content_role import VectorContentRole
 from magi.retrieval.application.models.vector_content_type import VectorContentType
 
 
@@ -13,6 +14,7 @@ class VectorPoint:
     document_version_id: UUID
     chunk_index: int
     content_type: VectorContentType
+    content_role: VectorContentRole
     heading_path: tuple[str, ...]
     text: str
     vector: tuple[float, ...]

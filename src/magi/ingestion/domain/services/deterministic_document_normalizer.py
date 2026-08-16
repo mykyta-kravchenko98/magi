@@ -90,6 +90,7 @@ class DeterministicDocumentNormalizer:
                             level=node.level,
                             text=text,
                             source_location=node.source_location,
+                            content_role=node.content_role,
                         )
                     )
             elif isinstance(node, Paragraph):
@@ -98,7 +99,13 @@ class DeterministicDocumentNormalizer:
                     pdf_hyphenated_words=known_words,
                 )
                 if text:
-                    nodes.append(Paragraph(text=text, source_location=node.source_location))
+                    nodes.append(
+                        Paragraph(
+                            text=text,
+                            source_location=node.source_location,
+                            content_role=node.content_role,
+                        )
+                    )
             else:
                 text = _normalize_code(node.text)
                 if text:
@@ -108,6 +115,7 @@ class DeterministicDocumentNormalizer:
                             text=text,
                             language=language or None,
                             source_location=node.source_location,
+                            content_role=node.content_role,
                         )
                     )
         if not any(isinstance(node, (Paragraph, CodeBlock)) for node in nodes):

@@ -166,11 +166,12 @@ PROCESSING -> SEARCHABLE
 4. Move the addition to `PROCESSING`.
 5. Extract ordered `DocumentNode` values. Preserve Markdown headings and fenced code blocks; preserve PDF page numbers and recognize structure only when it can be inferred reliably.
 6. Normalize node text deterministically without discarding node type, heading hierarchy, or source provenance.
-7. Register `Document` and `DocumentVersion(PROCESSING)`.
-8. Produce deterministic, structure-aware ordered chunks with stable zero-based indexes, heading paths, content types, and source spans.
-9. Request embeddings in bounded batches and validate count and dimension.
-10. Upsert deterministic points into Qdrant.
-11. Mark the version `SEARCHABLE`, then mark the addition `COMPLETED`.
+7. Classify content roles and select `body` and `front_matter` for indexing; retain but exclude `table_of_contents` and `header_footer`.
+8. Register `Document` and `DocumentVersion(PROCESSING)`.
+9. Produce deterministic, structure-aware ordered chunks with stable zero-based indexes, heading paths, content types, content roles, and source spans.
+10. Request embeddings in bounded batches and validate count and dimension.
+11. Upsert deterministic points into Qdrant.
+12. Mark the version `SEARCHABLE`, then mark the addition `COMPLETED`.
 
 External writes and PostgreSQL cannot be committed atomically in this slice. State changes are committed at meaningful checkpoints. A failure is recorded as `FAILED`; automatic compensation and cleanup are deferred.
 
@@ -285,7 +286,7 @@ Ports are narrow, typed contracts owned by the application module that consumes 
 | `EmbeddingProvider` | Embed an ordered batch; return model metadata and vectors in the same order |
 | `VectorIndex` | Ensure the configured collection and idempotently upsert ordered vector points |
 
-Normalization and chunking are deterministic in-process services, not infrastructure adapters. The minimal node types are `Heading`, `Paragraph`, and `CodeBlock`. Nodes carry text and optional source locations; headings carry a level and code blocks may carry a language. A chunk carries its active `heading_path`, content type, and the inclusive page range covering its source text when that information exists. External DTOs from the PDF library, MinIO, TEI, and Qdrant are translated at adapter boundaries.
+Normalization, content-role classification, selection, and chunking are deterministic in-process services, not infrastructure adapters. The minimal node types are `Heading`, `Paragraph`, and `CodeBlock`. Nodes carry text, a content role, and optional source locations; headings carry a level and code blocks may carry a language. A chunk carries its active `heading_path`, content type, content role, and the inclusive page range covering its source text when that information exists. External DTOs from the PDF library, MinIO, TEI, and Qdrant are translated at adapter boundaries.
 
 Every outbound network adapter has an explicit timeout. The embedding adapter verifies the pinned model revision, vector count, finite numeric values, and dimension `1024`. The Qdrant adapter uses a deterministic point ID derived from `document_version_id` and `chunk_index`.
 
@@ -338,6 +339,7 @@ Each point contains one embedding and a payload sufficient to prove indexability
   "document_version_id": "uuid",
   "chunk_index": 0,
   "content_type": "text",
+  "content_role": "body",
   "heading_path": [
     "Chapter 5 — Replication",
     "Leader-based replication"
@@ -348,7 +350,7 @@ Each point contains one embedding and a payload sufficient to prove indexability
 }
 ```
 
-`content_type` is `text`, `code`, or `mixed`. `page_start` and `page_end` are present for PDF chunks and absent for text formats. Preserving structure and provenance now enables later citations and filtering without changing the indexed chunk identity.
+`content_type` is `text`, `code`, or `mixed`. `content_role` is `body` or `front_matter` under the default indexing policy; the complete domain vocabulary also includes `table_of_contents` and `header_footer`. `page_start` and `page_end` are present for PDF chunks and absent for text formats. Preserving structure and provenance now enables later citations and filtering without changing the indexed chunk identity.
 
 The Qdrant collection uses 1024-dimensional vectors and Cosine distance. The collection name and immutable embedding/chunking profile identifiers are fixed in configuration.
 
@@ -362,18 +364,19 @@ The walking skeleton is done when all of the following are true:
 4. A text-based PDF book can be uploaded to an active knowledge base; UTF-8 TXT and Markdown remain supported secondary formats.
 5. The original bytes and media type are present in MinIO after upload.
 6. PDF parsing preserves page order and page provenance; Markdown parsing preserves headings and fenced code blocks.
-7. Structure-aware chunking is deterministic, respects natural boundaries, applies overlap only to split prose, and does not split an in-limit code block.
-8. Embeddings are produced by pinned `Qwen/Qwen3-Embedding-0.6B` through local TEI and validated as 1024-dimensional finite vectors before indexing.
-9. All expected chunks are present in a Cosine Qdrant collection with deterministic IDs and the documented payload.
-10. The version becomes `SEARCHABLE` only after the complete Qdrant upsert succeeds.
-11. The addition status endpoint exposes `COMPLETED` or a persisted, sanitized `FAILED` result.
-12. Empty, oversized, invalid UTF-8, unsupported, malformed, encrypted, and image-only PDF uploads have automated tests.
-13. Oversized prose, code blocks, heading paths, page spans, and chunking determinism have automated tests.
-14. Embedding and Qdrant failures have automated tests proving that `SEARCHABLE` is not set.
-15. Repository integration tests run against PostgreSQL; adapter integration tests run against real MinIO and Qdrant.
-16. An end-to-end test uploads a document, observes `COMPLETED`/`SEARCHABLE`, and confirms a technical similarity search finds its content.
-17. Restarting the Compose stack does not lose completed PostgreSQL, MinIO, or Qdrant data.
-18. Ruff, Pyright, unit tests, relevant integration tests, and the end-to-end test pass using documented commands.
+7. PDF nodes have deterministic content roles; table-of-contents and header/footer nodes are retained before selection but excluded from embedding and Qdrant by the default policy.
+8. Structure-aware chunking is deterministic, respects natural and content-role boundaries, applies overlap only to split prose, and does not split an in-limit code block.
+9. Embeddings are produced by pinned `Qwen/Qwen3-Embedding-0.6B` through local TEI and validated as 1024-dimensional finite vectors before indexing.
+10. All expected chunks are present in a Cosine Qdrant collection with deterministic IDs and the documented payload, including `content_role`.
+11. The version becomes `SEARCHABLE` only after the complete Qdrant upsert succeeds.
+12. The addition status endpoint exposes `COMPLETED` or a persisted, sanitized `FAILED` result.
+13. Empty, oversized, invalid UTF-8, unsupported, malformed, encrypted, and image-only PDF uploads have automated tests.
+14. Oversized prose, code blocks, heading paths, page spans, content roles, and chunking determinism have automated tests.
+15. Embedding and Qdrant failures have automated tests proving that `SEARCHABLE` is not set.
+16. Repository integration tests run against PostgreSQL; adapter integration tests run against real MinIO and Qdrant.
+17. An end-to-end test uploads a document, observes `COMPLETED`/`SEARCHABLE`, and confirms a technical similarity search finds its content.
+18. Restarting the Compose stack does not lose completed PostgreSQL, MinIO, or Qdrant data.
+19. Ruff, Pyright, unit tests, relevant integration tests, and the end-to-end test pass using documented commands.
 
 ## Deferred evolution to asynchronous processing
 

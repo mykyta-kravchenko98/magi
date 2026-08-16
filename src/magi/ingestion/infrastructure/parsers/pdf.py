@@ -15,6 +15,7 @@ from pdfplumber.utils.exceptions import PdfminerException
 
 from magi.ingestion.domain import (
     CodeBlock,
+    ContentRole,
     DocumentNode,
     Heading,
     Paragraph,
@@ -264,27 +265,27 @@ def _repeated_page_furniture(
     }
 
 
-def _remove_page_furniture(
+def _page_furniture_by_page(
     pages: Sequence[Sequence[_Line]],
     body_size: float,
     profile: PdfExtractionProfile,
-) -> tuple[tuple[_Line, ...], ...]:
+) -> tuple[frozenset[int], ...]:
     repeated = _repeated_page_furniture(pages, body_size, profile)
-    cleaned_pages: list[tuple[_Line, ...]] = []
+    furniture_by_page: list[frozenset[int]] = []
     for lines in pages:
         candidates = _page_furniture_indexes(len(lines), profile.page_furniture_candidate_lines)
-        cleaned_pages.append(
-            tuple(
-                line
+        furniture_by_page.append(
+            frozenset(
+                index
                 for index, line in enumerate(lines)
-                if index not in candidates
-                or (
-                    not _is_direct_page_furniture(line, index)
-                    and _canonical_page_furniture(line.text) not in repeated
+                if index in candidates
+                and (
+                    _is_direct_page_furniture(line, index)
+                    or _canonical_page_furniture(line.text) in repeated
                 )
             )
         )
-    return tuple(cleaned_pages)
+    return tuple(furniture_by_page)
 
 
 def _is_heading(line: _Line, body_size: float, profile: PdfExtractionProfile) -> bool:
@@ -353,6 +354,7 @@ def _code_block(lines: Sequence[_Line], profile: PdfExtractionProfile) -> CodeBl
 
 def _classify_page(
     lines: Sequence[_Line],
+    furniture_indexes: frozenset[int],
     body_size: float,
     heading_sizes: Sequence[float],
     profile: PdfExtractionProfile,
@@ -374,7 +376,19 @@ def _classify_page(
             nodes.append(_code_block(code_lines, profile))
             code_lines = []
 
-    for line in lines:
+    for line_index, line in enumerate(lines):
+        if line_index in furniture_indexes:
+            flush_paragraph()
+            flush_code()
+            nodes.append(
+                Paragraph(
+                    text=line.text,
+                    source_location=SourceLocation(page_number=line.page_number),
+                    content_role=ContentRole.HEADER_FOOTER,
+                )
+            )
+            previous_heading_line = None
+            continue
         if _is_heading(line, body_size, profile):
             flush_paragraph()
             flush_code()
@@ -463,16 +477,27 @@ class PdfParser:
         if not all_lines:
             raise PdfNoExtractableTextError("PDF has no extractable text layer")
         body_size = _body_font_size(all_lines)
-        pages = _remove_page_furniture(pages, body_size, self._profile)
-        all_lines = tuple(line for page in pages for line in page)
-        if not all_lines:
+        furniture_by_page = _page_furniture_by_page(pages, body_size, self._profile)
+        meaningful_lines = tuple(
+            line
+            for page_lines, furniture_indexes in zip(pages, furniture_by_page, strict=True)
+            for index, line in enumerate(page_lines)
+            if index not in furniture_indexes
+        )
+        if not meaningful_lines:
             raise PdfNoExtractableTextError("PDF has no meaningful text")
-        body_size = _body_font_size(all_lines)
-        heading_sizes = _heading_sizes(all_lines, body_size, self._profile)
+        body_size = _body_font_size(meaningful_lines)
+        heading_sizes = _heading_sizes(meaningful_lines, body_size, self._profile)
         nodes = tuple(
             node
-            for page_lines in pages
-            for node in _classify_page(page_lines, body_size, heading_sizes, self._profile)
+            for page_lines, furniture_indexes in zip(pages, furniture_by_page, strict=True)
+            for node in _classify_page(
+                page_lines,
+                furniture_indexes,
+                body_size,
+                heading_sizes,
+                self._profile,
+            )
         )
         if not nodes:
             raise PdfNoExtractableTextError("PDF has no meaningful text")

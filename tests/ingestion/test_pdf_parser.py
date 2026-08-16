@@ -9,12 +9,15 @@ from reportlab.pdfgen.canvas import Canvas
 from magi.ingestion.application import (
     DocumentFormatParser,
     DocumentParser,
+    IndexingContentPolicy,
     TextDocumentPipeline,
 )
 from magi.ingestion.domain import (
     CharacterChunkingConfig,
     CodeBlock,
+    ContentRole,
     DeterministicDocumentNormalizer,
+    DeterministicDocumentRoleClassifier,
     Heading,
     Paragraph,
     PdfEncryptedError,
@@ -167,14 +170,15 @@ def test_pdf_parser_joins_wrapped_lines_but_splits_list_items() -> None:
     assert paragraphs[3].text == "- Second capability is independent."
 
 
-def test_pdf_parser_removes_page_furniture_and_merges_wrapped_headings() -> None:
+def test_pdf_parser_marks_page_furniture_and_merges_wrapped_headings() -> None:
     parsed = PdfParser().parse(make_pdf_requiring_normalization())
 
     headings = [node for node in parsed.nodes if isinstance(node, Heading)]
     paragraphs = [node for node in parsed.nodes if isinstance(node, Paragraph)]
 
     assert [heading.text for heading in headings] == ["Normalization for Technical Books"]
-    assert all("Sample Book" not in node.text for node in parsed.nodes)
+    furniture = [node for node in parsed.nodes if node.content_role is ContentRole.HEADER_FOOTER]
+    assert [node.text for node in furniture] == ["16 | Sample Book", "Sample Book | 17"]
     assert any("represen-\ntation" in paragraph.text for paragraph in paragraphs)
     assert any(paragraph.text == "2024" for paragraph in paragraphs)
 
@@ -183,14 +187,29 @@ def test_pdf_parser_removes_page_furniture_and_merges_wrapped_headings() -> None
     normalized_text = "\n".join(node.text for node in normalized.nodes)
     assert "representation should be reconstructed" in normalized_text
     assert "Domain-driven design keeps its lexical hyphen" in normalized_text
+    assert [
+        node.text for node in normalized.nodes if node.content_role is ContentRole.HEADER_FOOTER
+    ] == ["16 | Sample Book", "Sample Book | 17"]
 
 
-def test_pdf_parser_removes_repeated_unnumbered_headers_and_footers() -> None:
+def test_pdf_parser_marks_repeated_unnumbered_headers_and_footers() -> None:
     parsed = PdfParser().parse(make_pdf_with_repeated_page_furniture())
 
     assert [node.text for node in parsed.nodes] == [
+        "Technical Books",
         "Unique body on page 1.",
+        "Confidential",
+        "Technical Books",
         "Unique body on page 2.",
+        "Confidential",
+    ]
+    assert [node.content_role for node in parsed.nodes] == [
+        ContentRole.HEADER_FOOTER,
+        ContentRole.BODY,
+        ContentRole.HEADER_FOOTER,
+        ContentRole.HEADER_FOOTER,
+        ContentRole.BODY,
+        ContentRole.HEADER_FOOTER,
     ]
 
 
@@ -224,6 +243,8 @@ def test_pdf_pipeline_can_be_composed_without_application_importing_pdfplumber()
     pipeline = TextDocumentPipeline(
         parser=parser,
         normalizer=DeterministicDocumentNormalizer(),
+        role_classifier=DeterministicDocumentRoleClassifier(),
+        indexing_policy=IndexingContentPolicy(),
         chunker=StructureAwareCharacterChunker(
             CharacterChunkingConfig(max_chars=100, overlap_chars=0)
         ),
