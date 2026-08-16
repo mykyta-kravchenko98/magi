@@ -4,7 +4,8 @@ Capture a retrieval baseline before changing PDF normalization. This is developm
 evaluation tooling: it calls the configured TEI and Qdrant services directly and does not add a
 retrieval endpoint or production application behavior.
 
-The checked-in suite at `evaluation/pdf-normalization/queries.json` contains semantic body
+The checked-in `ddd-book-pages-1-41-pdf-v1` suite at
+`evaluation/pdf-normalization/queries.json` targets the first 41 pages and contains semantic body
 queries plus diagnostics for table-of-contents competition, line-break hyphenation, and repeated
 page furniture. Keep the suite and `top-k` unchanged when comparing pipeline revisions.
 

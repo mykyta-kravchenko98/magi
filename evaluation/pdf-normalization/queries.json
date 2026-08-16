@@ -1,6 +1,6 @@
 {
-  "suite_id": "ddd-book-pages-1-20-pdf-v1",
-  "description": "Similarity baseline for the first 20 pages of Learning Domain-Driven Design before PDF normalization hardening.",
+  "suite_id": "ddd-book-pages-1-41-pdf-v1",
+  "description": "Similarity evaluation suite for the first 41 pages of Learning Domain-Driven Design.",
   "queries": [
     {
       "id": "body_domain_complexity",

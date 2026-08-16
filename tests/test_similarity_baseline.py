@@ -15,7 +15,7 @@ DOCUMENT_VERSION_ID = UUID("bbf15cac-8a40-4831-bc81-732bd958ff24")
 def test_checked_in_query_suite_is_valid() -> None:
     suite = load_query_suite(Path("evaluation/pdf-normalization/queries.json"))
 
-    assert suite.suite_id == "ddd-book-pages-1-20-pdf-v1"
+    assert suite.suite_id == "ddd-book-pages-1-41-pdf-v1"
     assert len(suite.queries) == 8
     assert len({query.query_id for query in suite.queries}) == len(suite.queries)
 
