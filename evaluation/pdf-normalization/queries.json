@@ -1,0 +1,46 @@
+{
+  "suite_id": "ddd-book-pages-1-20-pdf-v1",
+  "description": "Similarity baseline for the first 20 pages of Learning Domain-Driven Design before PDF normalization hardening.",
+  "queries": [
+    {
+      "id": "body_domain_complexity",
+      "text": "Почему Domain-Driven Design помогает управлять сложностью предметной области?",
+      "purpose": "Semantic body query about the central DDD motivation."
+    },
+    {
+      "id": "body_strategic_tactical",
+      "text": "Чем стратегическое проектирование отличается от тактического проектирования?",
+      "purpose": "Semantic body query whose answer is present in the preface."
+    },
+    {
+      "id": "body_domain_experts",
+      "text": "Какую роль эксперты предметной области играют в создании программного продукта?",
+      "purpose": "Paraphrased body query expected to retrieve the discussion of collaboration."
+    },
+    {
+      "id": "body_microservice_boundaries",
+      "text": "Почему DDD используют для определения границ микросервисов?",
+      "purpose": "Semantic body query from the editorial preface."
+    },
+    {
+      "id": "body_preface_author",
+      "text": "Кто написал предисловие к книге?",
+      "purpose": "Short factual query expected to retrieve the preface signature."
+    },
+    {
+      "id": "dehyphenation_represents",
+      "text": "Что представляет собой предметно-ориентированное проектирование?",
+      "purpose": "Diagnostic query for a body sentence currently affected by line-break hyphenation."
+    },
+    {
+      "id": "toc_eventstorming_page",
+      "text": "На какой странице находится глава про EventStorming?",
+      "purpose": "Diagnostic query expected to expose table-of-contents competition."
+    },
+    {
+      "id": "header_footer_preface",
+      "text": "20 | Предисловие",
+      "purpose": "Diagnostic exact-text query expected to expose a page header or footer chunk."
+    }
+  ]
+}
