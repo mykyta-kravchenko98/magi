@@ -35,6 +35,27 @@ document version. It records:
 Query vectors are intentionally omitted from the artifact. Review and commit the resulting JSON
 before normalization changes so it remains an immutable comparison input.
 
+## Captured pre-normalization result
+
+`evaluation/pdf-normalization/baseline-before-normalization.json` captures the eight-query suite
+at Git revision `5c0ab5a652b8ee2d240ab0dac5cffccfba4c06fb`. It contains 40 ranked results for
+document version `bbf15cac-8a40-4831-bc81-732bd958ff24`, using cosine search and the pinned
+1024-dimensional embedding profile.
+
+The six non-diagnostic queries establish the main quality baseline:
+
+- 14 of 30 top-five results are chunks headed `Оглавление`;
+- only two of six queries return useful prose content at rank one;
+- three queries return table-of-contents content at rank one;
+- the preface-author query returns the isolated `20 | Предисловие` page furniture at rank one and
+  the actual author signature at rank two;
+- the strategic-versus-tactical query has only table-of-contents chunks in its top five;
+- the dehyphenation query finds the relevant prose chunk at rank two, behind table-of-contents
+  content.
+
+These observations are descriptive, not acceptance thresholds. The post-normalization comparison
+must use the same query suite and `top-k`, while targeting the newly indexed document version.
+
 ## Compare after normalization
 
 Upload the same PDF after the normalization changes, then run the same command with the new

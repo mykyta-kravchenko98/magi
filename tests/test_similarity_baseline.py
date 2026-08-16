@@ -20,6 +20,34 @@ def test_checked_in_query_suite_is_valid() -> None:
     assert len({query.query_id for query in suite.queries}) == len(suite.queries)
 
 
+def test_checked_in_baseline_is_complete_and_version_filtered() -> None:
+    baseline = json.loads(
+        Path("evaluation/pdf-normalization/baseline-before-normalization.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert baseline["schema_version"] == 1
+    assert baseline["suite"]["suite_id"] == "ddd-book-pages-1-20-pdf-v1"
+    assert baseline["target"]["top_k"] == 5
+    assert baseline["embedding_profile"] == {
+        "model_id": "Qwen/Qwen3-Embedding-0.6B",
+        "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+        "vector_dimension": 1024,
+        "query_instruction": None,
+    }
+    assert len(baseline["queries"]) == 8
+
+    document_version_id = baseline["target"]["document_version_id"]
+    for query in baseline["queries"]:
+        assert [result["rank"] for result in query["results"]] == [1, 2, 3, 4, 5]
+        assert all(
+            result["payload"]["document_version_id"] == document_version_id
+            for result in query["results"]
+        )
+        assert all("vector" not in result for result in query["results"])
+
+
 def test_query_request_is_filtered_to_one_document_version() -> None:
     request = build_qdrant_query(
         (0.1, 0.2, 0.3),
