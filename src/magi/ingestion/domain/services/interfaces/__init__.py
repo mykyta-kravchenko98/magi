@@ -5,5 +5,13 @@ from magi.ingestion.domain.services.interfaces.document_normalizer import Docume
 from magi.ingestion.domain.services.interfaces.document_role_classifier import (
     DocumentRoleClassifier,
 )
+from magi.ingestion.domain.services.interfaces.document_structure_enricher import (
+    DocumentStructureEnricher,
+)
 
-__all__ = ["DocumentChunker", "DocumentNormalizer", "DocumentRoleClassifier"]
+__all__ = [
+    "DocumentChunker",
+    "DocumentNormalizer",
+    "DocumentRoleClassifier",
+    "DocumentStructureEnricher",
+]

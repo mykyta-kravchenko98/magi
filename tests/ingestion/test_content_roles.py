@@ -4,6 +4,7 @@ from magi.ingestion.application import IndexingContentPolicy
 from magi.ingestion.domain import (
     ContentRole,
     DeterministicDocumentRoleClassifier,
+    DeterministicDocumentStructureEnricher,
     Heading,
     NoTextContentError,
     Paragraph,
@@ -61,6 +62,67 @@ def test_classifier_leaves_non_pdf_documents_unchanged() -> None:
     )
 
     assert DeterministicDocumentRoleClassifier().classify(document) is document
+
+
+def test_pdf_structure_enricher_composes_numbered_part_and_chapter_titles() -> None:
+    document = ParsedDocument(
+        nodes=(
+            Heading(level=3, text="ЧАСТЬ I", source_location=pdf_location(31)),
+            Heading(
+                level=1,
+                text="Стратегическое проектирование",
+                source_location=pdf_location(31),
+            ),
+            Paragraph(text="Введение в часть", source_location=pdf_location(31)),
+            Heading(level=3, text="ГЛАВА 1", source_location=pdf_location(33)),
+            Heading(
+                level=2,
+                text="Анализ предметной области",
+                source_location=pdf_location(33),
+            ),
+        )
+    )
+
+    enriched = DeterministicDocumentStructureEnricher().enrich(document)
+
+    assert [(node.level, node.text) for node in enriched.nodes if isinstance(node, Heading)] == [
+        (1, "ЧАСТЬ I — Стратегическое проектирование"),
+        (2, "ГЛАВА 1 — Анализ предметной области"),
+    ]
+
+
+def test_structure_enricher_does_not_compose_across_pages_or_without_pdf_provenance() -> None:
+    document = ParsedDocument(
+        nodes=(
+            Heading(level=1, text="Part I"),
+            Heading(level=1, text="Architecture"),
+            Heading(level=1, text="Chapter 1", source_location=pdf_location(2)),
+            Heading(level=1, text="Domain model", source_location=pdf_location(3)),
+        )
+    )
+
+    assert DeterministicDocumentStructureEnricher().enrich(document) is document
+
+
+@pytest.mark.parametrize("heading", ["Часть I", "Часть 1", "Part IV", "Part 4"])
+def test_numbered_part_heading_starts_pdf_body(heading: str) -> None:
+    document = ParsedDocument(
+        nodes=(
+            Heading(level=1, text="Оглавление", source_location=pdf_location(2)),
+            Paragraph(text="Содержание", source_location=pdf_location(2)),
+            Heading(level=1, text=heading, source_location=pdf_location(10)),
+            Paragraph(text="Основной текст", source_location=pdf_location(10)),
+        )
+    )
+
+    classified = DeterministicDocumentRoleClassifier().classify(document)
+
+    assert [node.content_role for node in classified.nodes] == [
+        ContentRole.TABLE_OF_CONTENTS,
+        ContentRole.TABLE_OF_CONTENTS,
+        ContentRole.BODY,
+        ContentRole.BODY,
+    ]
 
 
 def test_default_indexing_policy_keeps_body_and_front_matter_only() -> None:

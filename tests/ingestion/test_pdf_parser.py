@@ -18,6 +18,7 @@ from magi.ingestion.domain import (
     ContentRole,
     DeterministicDocumentNormalizer,
     DeterministicDocumentRoleClassifier,
+    DeterministicDocumentStructureEnricher,
     Heading,
     Paragraph,
     PdfEncryptedError,
@@ -243,6 +244,7 @@ def test_pdf_pipeline_can_be_composed_without_application_importing_pdfplumber()
     pipeline = TextDocumentPipeline(
         parser=parser,
         normalizer=DeterministicDocumentNormalizer(),
+        structure_enricher=DeterministicDocumentStructureEnricher(),
         role_classifier=DeterministicDocumentRoleClassifier(),
         indexing_policy=IndexingContentPolicy(),
         chunker=StructureAwareCharacterChunker(

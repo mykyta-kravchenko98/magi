@@ -26,8 +26,14 @@ Assign every `DocumentNode` one of four technology-independent roles:
 All parsers produce `body` by default. The PDF adapter identifies page furniture from layout and
 retains it as `header_footer`. After normalization, a deterministic domain classifier recognizes
 Russian and English table-of-contents headings, common front-matter headings, and numbered
-chapter headings. It uses only normalized nodes and page provenance; it does not import a PDF
-library.
+part/chapter headings. `Часть/Part` and `Глава/Chapter` followed by a number or Roman numeral both
+start `body` content.
+
+Before classification, a deterministic domain structure enricher composes a standalone numbered
+part/chapter label with the immediately following heading on the same PDF page. The composed heading uses the title heading's level,
+so the hierarchy inferred from the title typography remains stable. The rule requires PDF page
+provenance and therefore cannot alter Markdown or TXT headings. Both enrichment and
+classification use only normalized nodes and page provenance; neither imports a PDF library.
 
 The application-owned indexing policy selects `body` and `front_matter` before chunking. It keeps
 `table_of_contents` and `header_footer` in the classified source structure but does not send them
@@ -43,6 +49,8 @@ Chunks never combine nodes with different roles.
 - TXT and Markdown behavior is unchanged because their nodes remain `body`.
 - Content-role heuristics are deterministic, independently testable, and can evolve without
   changing the PDF adapter, embedding provider, or Qdrant adapter.
+- Part and chapter identifiers remain visible in `heading_path` and therefore in Qdrant payloads
+  instead of being discarded as separate typographic labels.
 - A PDF containing only excluded roles fails with `NoTextContentError` rather than becoming a
   searchable version with zero points.
 - Reprocessing changes chunk indexes and point IDs for a new document version. Existing searchable
@@ -59,5 +67,7 @@ Chunks never combine nodes with different roles.
 - Infer table-of-contents page ranges from page numbers printed in its entries: deferred because
   the first useful rule only needs section boundaries; range reconciliation belongs to a later
   structure-enrichment profile.
+- Compose arbitrary neighboring headings: rejected because it could merge unrelated headings;
+  the accepted rule requires an exact numbered part/chapter label and the same PDF page.
 - Use an LLM classifier: rejected because the walking skeleton requires deterministic local
   processing without another model dependency.

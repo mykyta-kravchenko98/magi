@@ -3,8 +3,8 @@
 The transport- and provider-independent ingestion pipeline is implemented in `magi.ingestion`:
 
 ```text
-source bytes -> parse -> normalize -> classify roles -> select indexable nodes
-             -> character chunking -> DocumentChunk[]
+source bytes -> parse -> normalize -> enrich structure -> classify roles
+             -> select indexable nodes -> character chunking -> DocumentChunk[]
 ```
 
 Domain and application code deliberately have no imports from FastAPI, Pydantic, SQLAlchemy,
@@ -66,11 +66,19 @@ Code indentation and internal blank lines are retained; newline forms and traili
 normalized. A document with no paragraph or non-empty code content is rejected with
 `NoTextContentError`.
 
+## Structure enrichment
+
+After text normalization, a deterministic domain service composes split PDF book headings. An
+exact numbered `Часть/Part` or `Глава/Chapter` label is joined with the immediately following
+heading when both occur on the same page. The title heading's level is retained, producing paths
+such as `ЧАСТЬ I — Стратегическое проектирование` / `ГЛАВА 1 — Анализ предметной области` without
+guessing from table-of-contents page ranges. Nodes without PDF page provenance are unchanged.
+
 ## Content roles and indexing selection
 
 Every node carries `body`, `front_matter`, `table_of_contents`, or `header_footer`. TXT and
 Markdown nodes remain `body`. For PDF, the deterministic domain classifier recognizes explicit
-Russian and English contents headings, common front-matter headings, and numbered chapter
+Russian and English contents headings, common front-matter headings, and numbered part/chapter
 headings. It does not depend on `pdfplumber` or layout DTOs.
 
 The default application policy selects `body` and `front_matter` before chunking. Contents and
@@ -126,18 +134,20 @@ ingestion/domain/value_objects/content_role.py         # semantic node/chunk rol
 ingestion/domain/value_objects/document_chunk.py       # chunk output
 ingestion/domain/value_objects/chunking_profile.py     # immutable limits
 ingestion/domain/services/interfaces/document_normalizer.py # normalization contract
+ingestion/domain/services/interfaces/document_structure_enricher.py # enrichment contract
 ingestion/domain/services/interfaces/document_role_classifier.py # role contract
 ingestion/domain/services/interfaces/document_chunker.py    # chunking contract
 ingestion/domain/services/deterministic_document_normalizer.py # normalization policy
+ingestion/domain/services/deterministic_document_structure_enricher.py # heading composition
 ingestion/domain/services/deterministic_document_role_classifier.py # role policy
 ingestion/domain/services/structure_aware_chunker.py   # chunking policy
 ```
 
 These value objects are transient domain concepts; they do not require relational persistence or
 ORM models. Domain services transform them deterministically without owning identity or state.
-`TextDocumentPipeline` depends on the `DocumentNormalizer` and `DocumentChunker` protocols, so
-bootstrap can replace either strategy without changing the application workflow. The current
-implementations are `DeterministicDocumentNormalizer` and `StructureAwareCharacterChunker`.
+`TextDocumentPipeline` depends on protocols for normalization, structure enrichment, role
+classification, and chunking, so bootstrap can replace any strategy without changing the
+application workflow. The current implementations are deterministic domain services.
 
 Run its focused checks with:
 

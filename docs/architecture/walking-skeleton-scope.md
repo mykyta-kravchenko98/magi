@@ -166,7 +166,7 @@ PROCESSING -> SEARCHABLE
 4. Move the addition to `PROCESSING`.
 5. Extract ordered `DocumentNode` values. Preserve Markdown headings and fenced code blocks; preserve PDF page numbers and recognize structure only when it can be inferred reliably.
 6. Normalize node text deterministically without discarding node type, heading hierarchy, or source provenance.
-7. Classify content roles and select `body` and `front_matter` for indexing; retain but exclude `table_of_contents` and `header_footer`.
+7. Compose same-page numbered part/chapter labels with their titles, classify content roles, and select `body` and `front_matter` for indexing; retain but exclude `table_of_contents` and `header_footer`.
 8. Register `Document` and `DocumentVersion(PROCESSING)`.
 9. Produce deterministic, structure-aware ordered chunks with stable zero-based indexes, heading paths, content types, content roles, and source spans.
 10. Request embeddings in bounded batches and validate count and dimension.

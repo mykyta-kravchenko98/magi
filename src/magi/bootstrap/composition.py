@@ -19,6 +19,7 @@ from magi.ingestion.domain import (
     CharacterChunkingConfig,
     DeterministicDocumentNormalizer,
     DeterministicDocumentRoleClassifier,
+    DeterministicDocumentStructureEnricher,
     StructureAwareCharacterChunker,
 )
 from magi.ingestion.infrastructure import (
@@ -71,6 +72,7 @@ def create_application_runtime(
     content_pipeline = TextDocumentPipeline(
         parser=parser,
         normalizer=DeterministicDocumentNormalizer(),
+        structure_enricher=DeterministicDocumentStructureEnricher(),
         role_classifier=DeterministicDocumentRoleClassifier(),
         indexing_policy=IndexingContentPolicy(),
         chunker=StructureAwareCharacterChunker(

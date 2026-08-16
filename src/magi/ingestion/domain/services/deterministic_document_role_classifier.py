@@ -20,7 +20,7 @@ _FRONT_MATTER_HEADING = re.compile(
     re.IGNORECASE,
 )
 _BODY_HEADING = re.compile(
-    r"^(?:глава|chapter)\s+(?:\d+|[ivxlcdm]+)(?:\b|\s|[.:\u2013\u2014-])",
+    r"^(?:часть|part|глава|chapter)\s+(?:\d+|[ivxlcdm]+)(?:\b|\s|[.:\u2013\u2014-])",
     re.IGNORECASE,
 )
 

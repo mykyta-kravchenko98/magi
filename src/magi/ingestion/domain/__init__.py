@@ -13,9 +13,11 @@ from magi.ingestion.domain.errors import (
 from magi.ingestion.domain.services import (
     DeterministicDocumentNormalizer,
     DeterministicDocumentRoleClassifier,
+    DeterministicDocumentStructureEnricher,
     DocumentChunker,
     DocumentNormalizer,
     DocumentRoleClassifier,
+    DocumentStructureEnricher,
     StructureAwareCharacterChunker,
 )
 from magi.ingestion.domain.value_objects import (
@@ -39,11 +41,13 @@ __all__ = [
     "ContentRole",
     "DeterministicDocumentNormalizer",
     "DeterministicDocumentRoleClassifier",
+    "DeterministicDocumentStructureEnricher",
     "DocumentChunk",
     "DocumentChunker",
     "DocumentNode",
     "DocumentNormalizer",
     "DocumentRoleClassifier",
+    "DocumentStructureEnricher",
     "Heading",
     "InvalidTextEncodingError",
     "NoTextContentError",

@@ -6,6 +6,7 @@ from magi.ingestion.domain import (
     ChunkContentType,
     DeterministicDocumentNormalizer,
     DeterministicDocumentRoleClassifier,
+    DeterministicDocumentStructureEnricher,
     NoTextContentError,
     StructureAwareCharacterChunker,
 )
@@ -33,6 +34,7 @@ def test_markdown_pipeline_runs_parse_normalize_chunk_end_to_end() -> None:
     pipeline = TextDocumentPipeline(
         parser=text_parser_registry(),
         normalizer=DeterministicDocumentNormalizer(),
+        structure_enricher=DeterministicDocumentStructureEnricher(),
         role_classifier=DeterministicDocumentRoleClassifier(),
         indexing_policy=IndexingContentPolicy(),
         chunker=character_chunker(max_chars=30, overlap_chars=0),
@@ -52,6 +54,7 @@ def test_txt_pipeline_uses_supplied_chunking_configuration() -> None:
     pipeline = TextDocumentPipeline(
         parser=text_parser_registry(),
         normalizer=DeterministicDocumentNormalizer(),
+        structure_enricher=DeterministicDocumentStructureEnricher(),
         role_classifier=DeterministicDocumentRoleClassifier(),
         indexing_policy=IndexingContentPolicy(),
         chunker=character_chunker(max_chars=8, overlap_chars=0),
@@ -70,6 +73,7 @@ def test_pipeline_rejects_empty_normalized_documents(content: bytes) -> None:
         TextDocumentPipeline(
             parser=text_parser_registry(),
             normalizer=DeterministicDocumentNormalizer(),
+            structure_enricher=DeterministicDocumentStructureEnricher(),
             role_classifier=DeterministicDocumentRoleClassifier(),
             indexing_policy=IndexingContentPolicy(),
             chunker=character_chunker(),
