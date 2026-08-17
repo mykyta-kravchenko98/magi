@@ -24,6 +24,11 @@ document_instruction = none
 
 Use the 0.6B model's full 1024-dimensional output rather than Matryoshka truncation. This is a GPU-capacity tradeoff, not a finding that 0.6B matches the retrieval quality of 4B. Pin the exact model revision in configuration and record the profile ID with its projection. The application talks to TEI through `EmbeddingProvider`; it does not import PyTorch, Transformers, CUDA, or model-specific runtime code.
 
+The API process loads only the pinned `tokenizer.json` through Hugging Face `tokenizers` for exact
+chunk sizing. It does not load embedding model weights. The same `model_id` and `model_revision`
+configure both the tokenizer adapter and TEI, preventing a separately configurable tokenizer from
+drifting away from the embedding profile.
+
 For document embeddings, prefix non-empty `heading_path` values to the normalized chunk content but do not apply a query instruction. The future retrieval slice may define and version a fixed query instruction separately.
 
 The adapter rejects a response with the wrong model identity or revision when exposed by the server, wrong item count, wrong dimension, non-finite values, or reordered/missing results. Qdrant uses a dedicated collection compatible with dimension 1024 and Cosine distance.

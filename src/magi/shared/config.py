@@ -15,8 +15,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     docs_enabled: bool = True
     max_upload_bytes: int = Field(default=20 * 1_024 * 1_024, ge=1)
-    chunk_max_chars: int = Field(default=2_000, ge=1)
-    chunk_overlap_chars: int = Field(default=200, ge=0)
+    chunk_target_tokens: int = Field(default=600, ge=1)
+    chunk_soft_max_tokens: int = Field(default=800, ge=1)
+    chunk_hard_max_tokens: int = Field(default=1_000, ge=1)
+    chunk_overlap_tokens: int = Field(default=80, ge=0)
+    embedding_input_max_tokens: int = Field(default=2_048, ge=1)
     database_url: str = Field(
         default="postgresql+asyncpg://magi:magi@localhost:5432/magi",
         repr=False,

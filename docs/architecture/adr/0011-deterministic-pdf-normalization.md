@@ -37,6 +37,11 @@ document, when the left fragment is an uppercase abbreviation, or when the right
 known hyphenated particle. The representative Russian `бизнес-` compound prefix also retains its
 lexical hyphen.
 
+When PDF extraction has already flattened a visual line break into an inline hyphen, physical
+newline evidence is no longer available. As a deterministic fallback, the normalizer removes that
+inline hyphen only when the same PDF also contains the joined word. It does not change an
+unconfirmed inline hyphen, which keeps genuine compounds intact without a language dictionary.
+
 When a word is split between adjacent PDF paragraph nodes, the normalizer may look through only
 `footnote` and `header_footer` nodes on the same or immediately following page. It removes the
 fragment from the previous paragraph and moves the complete reconstructed word to the next body
@@ -59,8 +64,8 @@ indexing policy defined separately by ADR 0012.
   excluded by the default indexing policy.
 - The behavior is reproducible and covered by synthetic multi-page PDF fixtures plus a dry-run on
   the representative 20-page book sample.
-- Dictionary-free dehyphenation can still make mistakes for a compound that is split at its only
-  occurrence. Corpus evaluation must precede expanding the small explicit prefix set.
+- Dictionary-free dehyphenation can still miss an inline split when the joined form does not occur
+  elsewhere. Corpus evaluation must precede expanding the small explicit prefix set.
 - Trailing small-font detection is conservative and does not claim to recover arbitrary scholarly
   footnote layouts, endnotes, tables, or captions.
 - This changes parsing semantics. Existing searchable versions remain immutable; evaluation uses

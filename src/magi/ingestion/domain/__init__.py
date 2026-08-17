@@ -18,10 +18,10 @@ from magi.ingestion.domain.services import (
     DocumentNormalizer,
     DocumentRoleClassifier,
     DocumentStructureEnricher,
-    StructureAwareCharacterChunker,
+    StructureAwareTokenChunker,
+    TokenCounter,
 )
 from magi.ingestion.domain.value_objects import (
-    CharacterChunkingConfig,
     ChunkContentType,
     CodeBlock,
     ContentRole,
@@ -31,10 +31,11 @@ from magi.ingestion.domain.value_objects import (
     Paragraph,
     ParsedDocument,
     SourceLocation,
+    TokenChunkingProfile,
+    compose_embedding_input,
 )
 
 __all__ = [
-    "CharacterChunkingConfig",
     "ChunkContentType",
     "CodeBlock",
     "ContentBlockTooLargeError",
@@ -57,7 +58,10 @@ __all__ = [
     "PdfNoExtractableTextError",
     "PdfParsingError",
     "SourceLocation",
-    "StructureAwareCharacterChunker",
+    "StructureAwareTokenChunker",
     "TextPipelineError",
+    "TokenChunkingProfile",
+    "TokenCounter",
     "UnsupportedMediaTypeError",
+    "compose_embedding_input",
 ]

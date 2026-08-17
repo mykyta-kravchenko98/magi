@@ -286,7 +286,7 @@ Ports are narrow, typed contracts owned by the application module that consumes 
 | `EmbeddingProvider` | Embed an ordered batch; return model metadata and vectors in the same order |
 | `VectorIndex` | Ensure the configured collection and idempotently upsert ordered vector points |
 
-Normalization, content-role classification, selection, and chunking are deterministic in-process services, not infrastructure adapters. The minimal node types are `Heading`, `Paragraph`, and `CodeBlock`. Nodes carry text, a content role, and optional source locations; headings carry a level and code blocks may carry a language. A chunk carries its active `heading_path`, content type, content role, and the inclusive page range covering its source text when that information exists. External DTOs from the PDF library, MinIO, TEI, and Qdrant are translated at adapter boundaries.
+Normalization, content-role classification, selection, and chunking are deterministic in-process services. The chunker depends on a domain-owned `TokenCounter` protocol; its Hugging Face `tokenizers` adapter loads only the `tokenizer.json` artifact from the same pinned model revision as TEI and performs no network I/O after initialization. The minimal node types are `Heading`, `Paragraph`, and `CodeBlock`. Nodes carry text, a content role, and optional source locations; headings carry a level and code blocks may carry a language. A chunk carries its active `heading_path`, content type, content role, and the inclusive page range covering its source text when that information exists. External DTOs from the PDF library, tokenizer SDK, MinIO, TEI, and Qdrant are translated at adapter boundaries.
 
 Every outbound network adapter has an explicit timeout. The embedding adapter verifies the pinned model revision, vector count, finite numeric values, and dimension `1024`. The Qdrant adapter uses a deterministic point ID derived from `document_version_id` and `chunk_index`.
 
@@ -352,7 +352,10 @@ Each point contains one embedding and a payload sufficient to prove indexability
 
 `content_type` is `text`, `code`, or `mixed`. `content_role` is `body` or `front_matter` under the default indexing policy; the complete domain vocabulary also includes `table_of_contents`, `header_footer`, and `footnote`. `page_start` and `page_end` are present for PDF chunks and absent for text formats. Preserving structure and provenance now enables later citations and filtering without changing the indexed chunk identity.
 
-The Qdrant collection uses 1024-dimensional vectors and Cosine distance. The collection name and immutable embedding/chunking profile identifiers are fixed in configuration.
+The Qdrant collection uses 1024-dimensional vectors and Cosine distance. Token-aware profile v1
+uses `magi_knowledge_chunks_qwen3_06b_1024_token_v1`. The collection name and immutable
+embedding/chunking profile identifiers are fixed in configuration; points from the retired
+character profile are not mixed into this projection.
 
 ## Definition of Done
 

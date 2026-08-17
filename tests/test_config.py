@@ -1,6 +1,28 @@
 import pytest
 
-from magi.shared.config import EmbeddingSettings, QdrantSettings
+from magi.shared.config import EmbeddingSettings, QdrantSettings, Settings
+
+
+def test_token_chunking_settings_are_read_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    values = {
+        "MAGI_CHUNK_TARGET_TOKENS": "500",
+        "MAGI_CHUNK_SOFT_MAX_TOKENS": "700",
+        "MAGI_CHUNK_HARD_MAX_TOKENS": "900",
+        "MAGI_CHUNK_OVERLAP_TOKENS": "60",
+        "MAGI_EMBEDDING_INPUT_MAX_TOKENS": "1800",
+    }
+    for name, value in values.items():
+        monkeypatch.setenv(name, value)
+
+    settings = Settings()
+
+    assert settings.chunk_target_tokens == 500
+    assert settings.chunk_soft_max_tokens == 700
+    assert settings.chunk_hard_max_tokens == 900
+    assert settings.chunk_overlap_tokens == 60
+    assert settings.embedding_input_max_tokens == 1800
 
 
 def test_adapter_settings_are_read_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:

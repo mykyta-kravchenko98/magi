@@ -1,8 +1,12 @@
 """Public ingestion domain value objects."""
 
-from magi.ingestion.domain.value_objects.chunking_profile import CharacterChunkingConfig
+from magi.ingestion.domain.value_objects.chunking_profile import TokenChunkingProfile
 from magi.ingestion.domain.value_objects.content_role import ContentRole
-from magi.ingestion.domain.value_objects.document_chunk import ChunkContentType, DocumentChunk
+from magi.ingestion.domain.value_objects.document_chunk import (
+    ChunkContentType,
+    DocumentChunk,
+    compose_embedding_input,
+)
 from magi.ingestion.domain.value_objects.document_structure import (
     CodeBlock,
     DocumentNode,
@@ -13,7 +17,6 @@ from magi.ingestion.domain.value_objects.document_structure import (
 from magi.ingestion.domain.value_objects.source_location import SourceLocation
 
 __all__ = [
-    "CharacterChunkingConfig",
     "ChunkContentType",
     "CodeBlock",
     "ContentRole",
@@ -23,4 +26,6 @@ __all__ = [
     "Paragraph",
     "ParsedDocument",
     "SourceLocation",
+    "TokenChunkingProfile",
+    "compose_embedding_input",
 ]

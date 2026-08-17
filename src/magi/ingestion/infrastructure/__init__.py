@@ -8,9 +8,15 @@ from magi.ingestion.infrastructure.parsers import (
     PdfParser,
     TxtParser,
 )
+from magi.ingestion.infrastructure.tokenization import (
+    HuggingFaceTokenCounter,
+    HuggingFaceTokenizerConfig,
+)
 
 __all__ = [
     "DocumentParserRegistry",
+    "HuggingFaceTokenCounter",
+    "HuggingFaceTokenizerConfig",
     "MarkdownParser",
     "PdfExtractionProfile",
     "PdfParser",

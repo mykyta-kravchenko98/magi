@@ -1,22 +1,21 @@
-"""Deterministic, structure-aware character chunking."""
+"""Deterministic, structure-aware token chunking."""
 
-import re
 from dataclasses import dataclass
 
 from magi.ingestion.domain.errors import ContentBlockTooLargeError
+from magi.ingestion.domain.services._token_aware_prose_splitter import TokenAwareProseSplitter
+from magi.ingestion.domain.services.interfaces.token_counter import TokenCounter
 from magi.ingestion.domain.value_objects import (
-    CharacterChunkingConfig,
     ChunkContentType,
     CodeBlock,
     ContentRole,
     DocumentChunk,
     Heading,
-    Paragraph,
     ParsedDocument,
     SourceLocation,
+    TokenChunkingProfile,
+    compose_embedding_input,
 )
-
-_SENTENCE_END = re.compile(r"[.!?\u3002\uff01\uff1f](?:[\"')\]]*)\s+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,49 +24,6 @@ class _Unit:
     content_type: ChunkContentType
     location: SourceLocation | None
     content_role: ContentRole
-
-
-def _choose_break(text: str, start: int, limit: int) -> int:
-    if limit >= len(text):
-        return len(text)
-    minimum = start + max(1, (limit - start) // 2)
-    sentence_ends = [match.end() - 1 for match in _SENTENCE_END.finditer(text, start, limit + 1)]
-    sentence_ends = [end for end in sentence_ends if end >= minimum]
-    if sentence_ends:
-        return sentence_ends[-1]
-    whitespace = max(text.rfind(" ", minimum, limit + 1), text.rfind("\n", minimum, limit + 1))
-    return whitespace if whitespace >= minimum else limit
-
-
-def _overlap_prefix(text: str, cursor: int, size: int) -> str:
-    if size == 0:
-        return ""
-    consumed = text[:cursor].rstrip()
-    start = max(0, len(consumed) - max(0, size - 1))
-    if start:
-        boundary = consumed.find(" ", start)
-        if boundary != -1:
-            start = boundary + 1
-    suffix = consumed[start:]
-    return f"{suffix} " if suffix else ""
-
-
-def _split_paragraph(text: str, config: CharacterChunkingConfig) -> tuple[str, ...]:
-    pieces: list[str] = []
-    cursor = 0
-    while cursor < len(text):
-        prefix = _overlap_prefix(text, cursor, config.overlap_chars) if pieces else ""
-        limit = min(len(text), cursor + config.max_chars - len(prefix))
-        end = _choose_break(text, cursor, limit)
-        core = text[cursor:end].strip()
-        if not core:
-            end = min(len(text), max(cursor + 1, limit))
-            core = text[cursor:end].strip()
-        pieces.append(f"{prefix}{core}")
-        cursor = end
-        while cursor < len(text) and text[cursor].isspace():
-            cursor += 1
-    return tuple(pieces)
 
 
 def _content_type(units: list[_Unit]) -> ChunkContentType:
@@ -88,75 +44,149 @@ def _source_span(units: list[_Unit]) -> tuple[int | None, int | None, int | None
     )
 
 
-class StructureAwareCharacterChunker:
-    """Pack normalized nodes without crossing heading boundaries."""
+class StructureAwareTokenChunker:
+    """Chunk document sections using the tokenizer pinned to the embedding profile."""
 
-    def __init__(self, config: CharacterChunkingConfig | None = None) -> None:
-        self._config = config or CharacterChunkingConfig()
+    def __init__(
+        self,
+        token_counter: TokenCounter,
+        profile: TokenChunkingProfile | None = None,
+    ) -> None:
+        self._token_counter = token_counter
+        self._profile = profile or TokenChunkingProfile()
+        self._prose_splitter = TokenAwareProseSplitter(token_counter, self._profile)
 
     def chunk(self, document: ParsedDocument) -> tuple[DocumentChunk, ...]:
         chunks: list[DocumentChunk] = []
         heading_levels: list[tuple[int, str]] = []
-        pending: list[_Unit] = []
+        section: list[_Unit] = []
         active_role = ContentRole.BODY
 
         def heading_path() -> tuple[str, ...]:
             return tuple(text for _, text in heading_levels)
 
-        def emit(units: list[_Unit]) -> None:
-            if not units:
-                return
-            line_start, line_end, page_start, page_end = _source_span(units)
-            chunks.append(
-                DocumentChunk(
-                    index=len(chunks),
-                    text="\n\n".join(unit.text for unit in units),
-                    heading_path=heading_path(),
-                    content_type=_content_type(units),
-                    content_role=units[0].content_role,
-                    source_line_start=line_start,
-                    source_line_end=line_end,
-                    page_start=page_start,
-                    page_end=page_end,
+        def flush_section() -> None:
+            nonlocal section
+            chunks.extend(self._chunk_section(section, heading_path(), len(chunks)))
+            section = []
+
+        for node in document.nodes:
+            if isinstance(node, Heading):
+                flush_section()
+                active_role = node.content_role
+                heading_levels = [item for item in heading_levels if item[0] < node.level]
+                heading_levels.append((node.level, node.text))
+                continue
+
+            if section and node.content_role is not active_role:
+                flush_section()
+            active_role = node.content_role
+            section.append(
+                _Unit(
+                    text=node.text,
+                    content_type=(
+                        ChunkContentType.CODE
+                        if isinstance(node, CodeBlock)
+                        else ChunkContentType.TEXT
+                    ),
+                    location=node.source_location,
+                    content_role=active_role,
                 )
             )
+
+        flush_section()
+        return tuple(chunks)
+
+    def _chunk_section(
+        self,
+        units: list[_Unit],
+        heading_path: tuple[str, ...],
+        first_index: int,
+    ) -> list[DocumentChunk]:
+        if not units:
+            return []
+
+        for unit in units:
+            if unit.content_type is ChunkContentType.CODE:
+                self._validate_code_block(unit, heading_path)
+
+        if self._count_units(heading_path, units) <= self._profile.soft_max_tokens:
+            return [self._make_chunk(first_index, heading_path, units)]
+
+        chunks: list[DocumentChunk] = []
+        pending: list[_Unit] = []
+
+        def emit(items: list[_Unit]) -> None:
+            if items:
+                chunks.append(self._make_chunk(first_index + len(chunks), heading_path, items))
 
         def flush() -> None:
             nonlocal pending
             emit(pending)
             pending = []
 
-        for node in document.nodes:
-            if isinstance(node, Heading):
+        for unit in units:
+            unit_tokens = self._count_units(heading_path, [unit])
+            if unit.content_type is ChunkContentType.CODE and (
+                unit_tokens > self._profile.hard_max_tokens
+            ):
                 flush()
-                active_role = node.content_role
-                heading_levels = [item for item in heading_levels if item[0] < node.level]
-                heading_levels.append((node.level, node.text))
+                emit([unit])
+                continue
+            if unit.content_type is ChunkContentType.TEXT and (
+                unit_tokens > self._profile.soft_max_tokens
+            ):
+                flush()
+                for text in self._prose_splitter.split(unit.text, heading_path):
+                    emit(
+                        [
+                            _Unit(
+                                text=text,
+                                content_type=unit.content_type,
+                                location=unit.location,
+                                content_role=unit.content_role,
+                            )
+                        ]
+                    )
                 continue
 
-            content_type = (
-                ChunkContentType.CODE if isinstance(node, CodeBlock) else ChunkContentType.TEXT
-            )
-            if pending and node.content_role is not active_role:
-                flush()
-            active_role = node.content_role
-            if isinstance(node, CodeBlock) and len(node.text) > self._config.max_chars:
-                raise ContentBlockTooLargeError(
-                    f"code block has {len(node.text)} characters; limit is {self._config.max_chars}"
-                )
-            if isinstance(node, Paragraph) and len(node.text) > self._config.max_chars:
-                flush()
-                for piece in _split_paragraph(node.text, self._config):
-                    emit([_Unit(piece, content_type, node.source_location, active_role)])
-                continue
-
-            unit = _Unit(node.text, content_type, node.source_location, active_role)
-            candidate_length = sum(len(item.text) for item in pending) + len(unit.text)
-            if pending:
-                candidate_length += 2 * len(pending)
-            if pending and candidate_length > self._config.max_chars:
+            candidate = [*pending, unit]
+            if pending and self._count_units(heading_path, candidate) > self._profile.target_tokens:
                 flush()
             pending.append(unit)
 
         flush()
-        return tuple(chunks)
+        return chunks
+
+    def _validate_code_block(self, unit: _Unit, heading_path: tuple[str, ...]) -> None:
+        token_count = self._count_units(heading_path, [unit])
+        if token_count > self._profile.embedding_input_max_tokens:
+            raise ContentBlockTooLargeError(
+                f"code block embedding input has {token_count} tokens; "
+                f"safety limit is {self._profile.embedding_input_max_tokens}"
+            )
+
+    def _count_units(self, heading_path: tuple[str, ...], units: list[_Unit]) -> int:
+        return self._count_text(heading_path, "\n\n".join(unit.text for unit in units))
+
+    def _count_text(self, heading_path: tuple[str, ...], text: str) -> int:
+        return self._token_counter.count_tokens(compose_embedding_input(heading_path, text))
+
+    @staticmethod
+    def _make_chunk(
+        index: int,
+        heading_path: tuple[str, ...],
+        units: list[_Unit],
+    ) -> DocumentChunk:
+        line_start, line_end, page_start, page_end = _source_span(units)
+        return DocumentChunk(
+            index=index,
+            text="\n\n".join(unit.text for unit in units),
+            heading_path=heading_path,
+            content_type=_content_type(units),
+            content_role=units[0].content_role,
+            source_line_start=line_start,
+            source_line_end=line_end,
+            page_start=page_start,
+            page_end=page_end,
+        )

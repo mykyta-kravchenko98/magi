@@ -78,6 +78,44 @@ def test_normalizer_dehyphenates_pdf_line_breaks_and_preserves_known_compounds()
     )
 
 
+def test_normalizer_repairs_inline_pdf_split_when_joined_form_is_confirmed() -> None:
+    first_page = SourceLocation(page_number=1)
+    second_page = SourceLocation(page_number=2)
+    document = ParsedDocument(
+        nodes=(
+            Paragraph(
+                text="DDD пред-ставляет собой набор методов.",
+                source_location=first_page,
+            ),
+            Paragraph(
+                text="Автор представляет другой пример.",
+                source_location=second_page,
+            ),
+            Paragraph(
+                text="Client-server remains a real compound.",
+                source_location=second_page,
+            ),
+        )
+    )
+
+    normalized = DeterministicDocumentNormalizer().normalize(document)
+
+    assert normalized.nodes == (
+        Paragraph(
+            text="DDD представляет собой набор методов.",
+            source_location=first_page,
+        ),
+        Paragraph(
+            text="Автор представляет другой пример.",
+            source_location=second_page,
+        ),
+        Paragraph(
+            text="Client-server remains a real compound.",
+            source_location=second_page,
+        ),
+    )
+
+
 def test_normalizer_repairs_pdf_words_split_across_nodes_and_page_furniture() -> None:
     first_page = SourceLocation(page_number=1)
     second_page = SourceLocation(page_number=2)

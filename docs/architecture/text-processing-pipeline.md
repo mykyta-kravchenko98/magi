@@ -4,7 +4,7 @@ The transport- and provider-independent ingestion pipeline is implemented in `ma
 
 ```text
 source bytes -> parse -> normalize -> enrich structure -> classify roles
-             -> select indexable nodes -> character chunking -> DocumentChunk[]
+             -> select indexable nodes -> token-aware chunking -> DocumentChunk[]
 ```
 
 Domain and application code deliberately have no imports from FastAPI, Pydantic, SQLAlchemy,
@@ -66,7 +66,10 @@ at physical line breaks between letters. A known hyphenated form found elsewhere
 an uppercase abbreviation, a hyphenated particle, or the representative `бизнес-` compound prefix
 preserves the hyphen. Words split across adjacent paragraph nodes or pages are also reconstructed
 while looking through only `footnote` and `header_footer` nodes. This behavior applies only to
-nodes carrying PDF page provenance; TXT, Markdown, and code are unaffected.
+nodes carrying PDF page provenance. If extraction has already flattened a visual line break into
+an inline hyphen, the normalizer joins it only when the same PDF also contains the joined word as
+independent evidence. Unconfirmed inline hyphens remain unchanged. TXT, Markdown, and code are
+unaffected.
 
 Code indentation and internal blank lines are retained; newline forms and trailing whitespace are
 normalized. A document with no paragraph or non-empty code content is rejected with
@@ -92,20 +95,40 @@ page furniture and footnotes remain available in the classified structure but do
 embedding API or Qdrant. A document with no eligible nodes fails explicitly. Selected chunks carry `content_role`,
 and Qdrant stores it for later filtering and diagnostics.
 
-## Character chunking profile
+## Token-aware chunking profile v1
 
-`CharacterChunkingConfig` exposes `max_chars` and `overlap_chars`. The character profile is an
-explicit interim profile and is not the token-aware `v1` profile described by ADR 0007.
+`StructureAwareTokenChunker` uses `TokenChunkingProfile` and the tokenizer from the pinned
+embedding model revision:
 
-- chunks never cross a heading boundary and carry the active heading hierarchy;
-- paragraphs and atomic code blocks are packed up to `max_chars`;
+```text
+target_tokens = 600
+soft_max_tokens = 800
+hard_max_tokens = 1000
+overlap_tokens = 80
+embedding_input_max_tokens = 2048
+```
+
+- the token count covers the exact embedding input: the active `heading_path` followed by chunk
+  text;
+- a section that fits the soft maximum remains coherent even when it exceeds the target;
+- an oversized section is packed on paragraph boundaries around the target;
 - oversized prose is split at sentence, then word, then hard character boundaries;
 - overlap is used only between pieces of the same oversized paragraph;
-- code blocks are never split and raise `ContentBlockTooLargeError` above `max_chars`;
-- chunk indexes, content types, content roles, source spans, and output order are deterministic;
-- chunks never combine nodes with different content roles.
+- an in-limit code block is atomic; one above the hard maximum remains a single explicitly
+  oversized chunk up to the embedding-input safety limit;
+- chunks never cross heading or content-role boundaries and retain deterministic indexes, types,
+  roles, source spans, and order.
 
-Tokenizer-aware sizing remains deferred. OCR is also deferred: image-only/scanned PDFs fail with
+The domain depends only on its `TokenCounter` protocol. `HuggingFaceTokenCounter` is an
+infrastructure adapter backed by the official `tokenizers` library; bootstrap loads
+`tokenizer.json` from the same immutable model ID and revision configured for TEI. No model weights,
+PyTorch, Transformers, or CUDA runtime are loaded into the API process.
+
+Changing from the retired character profile to token profile v1 changes chunk identities and uses
+the dedicated `magi_knowledge_chunks_qwen3_06b_1024_token_v1` Qdrant collection. Existing
+character-profile points are not reinterpreted or overwritten.
+
+OCR remains deferred: image-only/scanned PDFs fail with
 `PdfNoExtractableTextError`; Tesseract or another OCR engine belongs in a separate adapter and
 processing profile rather than an implicit fallback in this parser.
 
@@ -143,10 +166,12 @@ ingestion/domain/services/interfaces/document_normalizer.py # normalization cont
 ingestion/domain/services/interfaces/document_structure_enricher.py # enrichment contract
 ingestion/domain/services/interfaces/document_role_classifier.py # role contract
 ingestion/domain/services/interfaces/document_chunker.py    # chunking contract
+ingestion/domain/services/interfaces/token_counter.py       # pinned-tokenizer counting contract
 ingestion/domain/services/deterministic_document_normalizer.py # normalization policy
 ingestion/domain/services/deterministic_document_structure_enricher.py # heading composition
 ingestion/domain/services/deterministic_document_role_classifier.py # role policy
 ingestion/domain/services/structure_aware_chunker.py   # chunking policy
+ingestion/infrastructure/tokenization/hugging_face.py   # pinned tokenizer adapter
 ```
 
 These value objects are transient domain concepts; they do not require relational persistence or
