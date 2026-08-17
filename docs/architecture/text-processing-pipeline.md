@@ -66,7 +66,10 @@ at physical line breaks between letters. A known hyphenated form found elsewhere
 an uppercase abbreviation, a hyphenated particle, or the representative `бизнес-` compound prefix
 preserves the hyphen. Words split across adjacent paragraph nodes or pages are also reconstructed
 while looking through only `footnote` and `header_footer` nodes. This behavior applies only to
-nodes carrying PDF page provenance; TXT, Markdown, and code are unaffected.
+nodes carrying PDF page provenance. If extraction has already flattened a visual line break into
+an inline hyphen, the normalizer joins it only when the same PDF also contains the joined word as
+independent evidence. Unconfirmed inline hyphens remain unchanged. TXT, Markdown, and code are
+unaffected.
 
 Code indentation and internal blank lines are retained; newline forms and trailing whitespace are
 normalized. A document with no paragraph or non-empty code content is rejected with
