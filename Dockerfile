@@ -5,6 +5,7 @@ FROM python:3.13-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    HF_HOME="/app/.cache/huggingface" \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app

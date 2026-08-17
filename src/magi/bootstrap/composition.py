@@ -16,14 +16,16 @@ from magi.ingestion.application import (
     TextDocumentPipeline,
 )
 from magi.ingestion.domain import (
-    CharacterChunkingConfig,
     DeterministicDocumentNormalizer,
     DeterministicDocumentRoleClassifier,
     DeterministicDocumentStructureEnricher,
-    StructureAwareCharacterChunker,
+    StructureAwareTokenChunker,
+    TokenChunkingProfile,
 )
 from magi.ingestion.infrastructure import (
     DocumentParserRegistry,
+    HuggingFaceTokenCounter,
+    HuggingFaceTokenizerConfig,
     MarkdownParser,
     PdfParser,
     TeiEmbeddingConfig,
@@ -75,11 +77,20 @@ def create_application_runtime(
         structure_enricher=DeterministicDocumentStructureEnricher(),
         role_classifier=DeterministicDocumentRoleClassifier(),
         indexing_policy=IndexingContentPolicy(),
-        chunker=StructureAwareCharacterChunker(
-            CharacterChunkingConfig(
-                max_chars=settings.chunk_max_chars,
-                overlap_chars=settings.chunk_overlap_chars,
-            )
+        chunker=StructureAwareTokenChunker(
+            HuggingFaceTokenCounter.from_pretrained(
+                HuggingFaceTokenizerConfig(
+                    model_id=embedding_settings.model_id,
+                    model_revision=embedding_settings.model_revision,
+                )
+            ),
+            TokenChunkingProfile(
+                target_tokens=settings.chunk_target_tokens,
+                soft_max_tokens=settings.chunk_soft_max_tokens,
+                hard_max_tokens=settings.chunk_hard_max_tokens,
+                overlap_tokens=settings.chunk_overlap_tokens,
+                embedding_input_max_tokens=settings.embedding_input_max_tokens,
+            ),
         ),
     )
     embedding_provider = TeiEmbeddingProvider(

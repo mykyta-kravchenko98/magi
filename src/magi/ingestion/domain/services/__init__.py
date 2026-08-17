@@ -14,9 +14,10 @@ from magi.ingestion.domain.services.interfaces import (
     DocumentNormalizer,
     DocumentRoleClassifier,
     DocumentStructureEnricher,
+    TokenCounter,
 )
 from magi.ingestion.domain.services.structure_aware_chunker import (
-    StructureAwareCharacterChunker,
+    StructureAwareTokenChunker,
 )
 
 __all__ = [
@@ -27,5 +28,6 @@ __all__ = [
     "DocumentNormalizer",
     "DocumentRoleClassifier",
     "DocumentStructureEnricher",
-    "StructureAwareCharacterChunker",
+    "StructureAwareTokenChunker",
+    "TokenCounter",
 ]

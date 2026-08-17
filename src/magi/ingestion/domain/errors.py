@@ -18,7 +18,7 @@ class NoTextContentError(TextPipelineError):
 
 
 class ContentBlockTooLargeError(TextPipelineError):
-    """An atomic code block cannot fit the configured character limit."""
+    """Content cannot fit the pinned embedding input safety limit."""
 
 
 class PdfParsingError(TextPipelineError):

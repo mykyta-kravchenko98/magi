@@ -73,3 +73,15 @@ uv run python -m scripts.capture_similarity_baseline `
 Do not compare a mixed collection without the document-version filter. Chunk identities and
 scores may change after normalization; compare relevance, content role, text quality, and noisy
 result frequency rather than expecting identical point IDs.
+
+## Compare token-aware chunking
+
+The complete-book post-normalization baseline is a local evaluation artifact rather than runtime
+input. Keep it outside Git because Qdrant payloads contain substantial copyrighted book text. For
+the token-aware comparison, upload the same complete PDF into
+`magi_knowledge_chunks_qwen3_06b_1024_token_v1`, run the unchanged queries and `top-k`, and save the
+result separately as `baseline-full-book-token-aware-v1.json`.
+
+Compare ranked relevance, roles, page provenance, chunk sizes, and noisy-result frequency. Do not
+expect stable point IDs or scores: the new upload has a new `document_version_id`, and changing the
+chunking profile intentionally changes chunk boundaries and embedding inputs.

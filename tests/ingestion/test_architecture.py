@@ -21,11 +21,13 @@ def test_domain_and_application_do_not_import_ingestion_infrastructure() -> None
         *INGESTION_SOURCE.joinpath("application").rglob("*.py"),
     )
 
+    forbidden_prefixes = (
+        "magi.ingestion.infrastructure",
+        "tokenizers",
+    )
     violations = {
         str(path.relative_to(INGESTION_SOURCE)): sorted(
-            module
-            for module in imported_modules(path)
-            if module.startswith("magi.ingestion.infrastructure")
+            module for module in imported_modules(path) if module.startswith(forbidden_prefixes)
         )
         for path in inward_files
     }

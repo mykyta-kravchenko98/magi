@@ -34,8 +34,11 @@ The Qdrant adapter:
 - uses Qdrant upsert with `wait=true`, so retrying the same immutable chunk identity
   updates the same point and waits until the operation is applied.
 
-Changing the embedding dimension or distance requires a new collection and a full
-reindex. Do not repurpose an existing collection with an incompatible embedding profile.
+Changing the embedding dimension, distance, tokenizer, or chunking profile requires a new
+collection and a full reindex. Do not mix points produced by incompatible processing profiles.
+Token-aware profile v1 uses `magi_knowledge_chunks_qwen3_06b_1024_token_v1`; the previous
+character-profile collection remains available for baseline comparison until it is explicitly
+retired.
 
 ## Local integration test
 

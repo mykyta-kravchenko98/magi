@@ -35,6 +35,12 @@ Treat an in-limit code block atomically and never copy it into overlap. A code b
 
 Token counting uses the tokenizer revision pinned to the embedding profile. `RecursiveCharacterTextSplitter` or equivalent behavior may be used only as an internal final fallback after structural and prose boundaries, not as the architecture-facing contract.
 
+The domain chunker depends on a narrow `TokenCounter` protocol. Bootstrap supplies an
+infrastructure adapter backed by Hugging Face `tokenizers`, loading `tokenizer.json` from the exact
+model ID and immutable revision used by TEI. Token limits include the complete embedding input,
+including the active heading prefix. The tokenizer SDK, Hub access, and cache behavior remain
+outside the domain layer.
+
 ## Consequences
 
 - Technical sections and code retain substantially more context than fixed-width chunks.
@@ -42,6 +48,7 @@ Token counting uses the tokenizer revision pinned to the embedding profile. `Rec
 - The same source and immutable profiles produce the same node order, chunks, indexes, and point IDs.
 - PDF results depend on extraction quality but degrade to paragraph-aware chunking rather than blocking the complete pipeline.
 - Changing node recognition, tokenizer, or chunking parameters creates a new versioned processing profile and requires reindexing; existing chunk identities are not silently reinterpreted.
+- Token profile v1 uses a dedicated Qdrant collection rather than mixing its points with the retired interim character profile.
 
 ## Rejected alternatives
 

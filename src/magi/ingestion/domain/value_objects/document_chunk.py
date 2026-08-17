@@ -23,3 +23,9 @@ class DocumentChunk:
     source_line_end: int | None = None
     page_start: int | None = None
     page_end: int | None = None
+
+
+def compose_embedding_input(heading_path: tuple[str, ...], text: str) -> str:
+    """Build the exact text whose tokens constrain chunk size and embedding input."""
+
+    return "\n\n".join((*heading_path, text))

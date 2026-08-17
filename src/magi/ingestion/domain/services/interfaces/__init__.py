@@ -8,10 +8,12 @@ from magi.ingestion.domain.services.interfaces.document_role_classifier import (
 from magi.ingestion.domain.services.interfaces.document_structure_enricher import (
     DocumentStructureEnricher,
 )
+from magi.ingestion.domain.services.interfaces.token_counter import TokenCounter
 
 __all__ = [
     "DocumentChunker",
     "DocumentNormalizer",
     "DocumentRoleClassifier",
     "DocumentStructureEnricher",
+    "TokenCounter",
 ]

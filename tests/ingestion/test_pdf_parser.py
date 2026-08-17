@@ -13,7 +13,6 @@ from magi.ingestion.application import (
     TextDocumentPipeline,
 )
 from magi.ingestion.domain import (
-    CharacterChunkingConfig,
     CodeBlock,
     ContentRole,
     DeterministicDocumentNormalizer,
@@ -24,7 +23,8 @@ from magi.ingestion.domain import (
     PdfEncryptedError,
     PdfNoExtractableTextError,
     PdfParsingError,
-    StructureAwareCharacterChunker,
+    StructureAwareTokenChunker,
+    TokenChunkingProfile,
     UnsupportedMediaTypeError,
 )
 from magi.ingestion.infrastructure import (
@@ -32,6 +32,11 @@ from magi.ingestion.infrastructure import (
     PdfExtractionProfile,
     PdfParser,
 )
+
+
+class WordTokenCounter:
+    def count_tokens(self, text: str) -> int:
+        return len(text.split())
 
 
 def make_structured_pdf(*, encrypted: bool = False) -> bytes:
@@ -300,8 +305,15 @@ def test_pdf_pipeline_can_be_composed_without_application_importing_pdfplumber()
         structure_enricher=DeterministicDocumentStructureEnricher(),
         role_classifier=DeterministicDocumentRoleClassifier(),
         indexing_policy=IndexingContentPolicy(),
-        chunker=StructureAwareCharacterChunker(
-            CharacterChunkingConfig(max_chars=100, overlap_chars=0)
+        chunker=StructureAwareTokenChunker(
+            WordTokenCounter(),
+            TokenChunkingProfile(
+                target_tokens=100,
+                soft_max_tokens=100,
+                hard_max_tokens=100,
+                overlap_tokens=0,
+                embedding_input_max_tokens=100,
+            ),
         ),
     )
 

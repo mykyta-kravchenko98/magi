@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from magi.ingestion.application.interfaces import EmbeddingProvider
 from magi.ingestion.application.models import EmbeddingBatch
-from magi.ingestion.domain import DocumentChunk
+from magi.ingestion.domain import DocumentChunk, compose_embedding_input
 
 
 class DocumentEmbeddingService:
@@ -17,4 +17,4 @@ class DocumentEmbeddingService:
 
     @staticmethod
     def _embedding_input(chunk: DocumentChunk) -> str:
-        return "\n\n".join((*chunk.heading_path, chunk.text))
+        return compose_embedding_input(chunk.heading_path, chunk.text)

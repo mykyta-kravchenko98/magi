@@ -35,7 +35,10 @@ docker compose --profile gpu up --build --detach --wait
 docker compose --profile gpu ps
 ```
 
-The first TEI start downloads the pinned embedding model and can take several minutes.
+The first TEI start downloads the pinned embedding model and can take several minutes. The API
+also downloads and caches `tokenizer.json` from the same pinned revision for token-aware chunking;
+it does not load model weights. The container cache is stored under the app-owned
+`/app/.cache/huggingface` directory.
 The API is available at `http://127.0.0.1:8000`. Upload a Markdown document to the seeded
 knowledge base with:
 
@@ -79,6 +82,13 @@ It is deployment seed data, not a content-deduplication or knowledge-base manage
 Configuration uses `MAGI_`-prefixed environment variables; copy `.env.example` to
 `.env` for local overrides. The default database URL targets PostgreSQL on
 `localhost:5432`.
+
+The token-aware v1 projection writes to
+`magi_knowledge_chunks_qwen3_06b_1024_token_v1`. Documents indexed by the retired character
+profile remain in their previous collection and must be uploaded again to create token-profile
+points; the application does not silently migrate existing vectors. Existing local `.env` files
+must be updated from `.env.example`, especially the `MAGI_CHUNK_*`,
+`MAGI_EMBEDDING_INPUT_MAX_TOKENS`, and `MAGI_QDRANT_COLLECTION` values, before rebuilding Compose.
 
 - `GET /health/live` reports process liveness and performs no external I/O.
 - `GET /health/ready` checks that PostgreSQL accepts a query.
