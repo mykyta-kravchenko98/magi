@@ -78,7 +78,6 @@ async def test_real_markdown_upload_becomes_searchable_and_exists_in_qdrant() ->
     assert {point["payload"]["document_version_id"] for point in points} == {document_version_id}
     assert any(
         point["payload"]["heading_path"] == ["Walking Skeleton"]
-        and "upload pipeline stores this markdown source"
-        in point["payload"]["text"].lower()
+        and "upload pipeline stores this markdown source" in point["payload"]["text"].lower()
         for point in points
     )
