@@ -2,6 +2,7 @@ import pytest
 
 from magi.ingestion.domain import (
     CodeBlock,
+    ContentRole,
     DeterministicDocumentNormalizer,
     DocumentNormalizer,
     Heading,
@@ -52,6 +53,10 @@ def test_normalizer_dehyphenates_pdf_line_breaks_and_preserves_known_compounds()
                 text="A represen-\ntation remains Domain-\ndriven.",
                 source_location=second_page,
             ),
+            Paragraph(
+                text="Бизнес-\nценности важны.",  # noqa: RUF001
+                source_location=second_page,
+            ),
         )
     )
 
@@ -66,6 +71,66 @@ def test_normalizer_dehyphenates_pdf_line_breaks_and_preserves_known_compounds()
             text="A representation remains Domain-driven.",
             source_location=second_page,
         ),
+        Paragraph(
+            text="Бизнес-ценности важны.",
+            source_location=second_page,
+        ),
+    )
+
+
+def test_normalizer_repairs_pdf_words_split_across_nodes_and_page_furniture() -> None:
+    first_page = SourceLocation(page_number=1)
+    second_page = SourceLocation(page_number=2)
+    document = ParsedDocument(
+        nodes=(
+            Paragraph(text="Для этого было проведе-", source_location=first_page),
+            Paragraph(
+                text="2",
+                source_location=first_page,
+                content_role=ContentRole.FOOTNOTE,
+            ),
+            Paragraph(
+                text="но множество исследований. Причина исследова-",
+                source_location=first_page,
+            ),
+            Paragraph(
+                text="Текст сноски.",
+                source_location=first_page,
+                content_role=ContentRole.FOOTNOTE,
+            ),
+            Paragraph(
+                text="2 | Вступление",
+                source_location=second_page,
+                content_role=ContentRole.HEADER_FOOTER,
+            ),
+            Paragraph(text="телям известна.", source_location=second_page),
+        )
+    )
+
+    normalized = DeterministicDocumentNormalizer().normalize(document)
+
+    assert normalized.nodes == (
+        Paragraph(text="Для этого было", source_location=first_page),
+        Paragraph(
+            text="2",
+            source_location=first_page,
+            content_role=ContentRole.FOOTNOTE,
+        ),
+        Paragraph(
+            text="проведено множество исследований. Причина",
+            source_location=first_page,
+        ),
+        Paragraph(
+            text="Текст сноски.",
+            source_location=first_page,
+            content_role=ContentRole.FOOTNOTE,
+        ),
+        Paragraph(
+            text="2 | Вступление",
+            source_location=second_page,
+            content_role=ContentRole.HEADER_FOOTER,
+        ),
+        Paragraph(text="исследователям известна.", source_location=second_page),
     )
 
 

@@ -44,7 +44,7 @@ class DeterministicDocumentRoleClassifier:
         classified: list[DocumentNode] = []
 
         for node in document.nodes:
-            if node.content_role is ContentRole.HEADER_FOOTER:
+            if node.content_role in {ContentRole.HEADER_FOOTER, ContentRole.FOOTNOTE}:
                 classified.append(node)
                 continue
             if not _is_pdf_node(node):

@@ -6,5 +6,6 @@ type VectorContentRole = Literal[
     "body",
     "table_of_contents",
     "header_footer",
+    "footnote",
     "front_matter",
 ]

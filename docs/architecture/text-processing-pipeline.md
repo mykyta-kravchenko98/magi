@@ -38,8 +38,12 @@ heading-line joining, page-furniture candidates, and recognized monospace font n
 - bare page numbers, numbered running titles, short page ornaments, and repeated low-emphasis
   headers/footers are identified in configurable page-edge candidates and retained with the
   `header_footer` role;
+- isolated small reference numbers and sufficiently separated trailing small-font blocks are
+  retained with the `footnote` role;
 - ordinary consecutive lines become paragraphs; visual gaps and new list markers create a new
   paragraph;
+- a leading `(cid:2)` placeholder observed for list bullets in the representative PDF is emitted
+  as `•`; other CID values and inline occurrences remain untouched;
 - sufficiently large or bold short lines become headings, with levels derived from descending
   heading font sizes across the document;
 - adjacent same-level heading lines on one page are merged when their visual gap is within the
@@ -59,8 +63,10 @@ reconstruction require representative fixtures before expanding the extraction p
 Normalization is deterministic: Unicode is converted to NFC, prose whitespace is collapsed,
 and empty nodes are removed. Before whitespace collapsing, PDF prose removes hyphens that occur
 at physical line breaks between letters. A known hyphenated form found elsewhere in the document,
-an uppercase abbreviation, or a hyphenated particle preserves the hyphen. This behavior applies
-only to nodes carrying PDF page provenance; TXT, Markdown, and code are unaffected.
+an uppercase abbreviation, a hyphenated particle, or the representative `бизнес-` compound prefix
+preserves the hyphen. Words split across adjacent paragraph nodes or pages are also reconstructed
+while looking through only `footnote` and `header_footer` nodes. This behavior applies only to
+nodes carrying PDF page provenance; TXT, Markdown, and code are unaffected.
 
 Code indentation and internal blank lines are retained; newline forms and trailing whitespace are
 normalized. A document with no paragraph or non-empty code content is rejected with
@@ -76,14 +82,14 @@ guessing from table-of-contents page ranges. Nodes without PDF page provenance a
 
 ## Content roles and indexing selection
 
-Every node carries `body`, `front_matter`, `table_of_contents`, or `header_footer`. TXT and
+Every node carries `body`, `front_matter`, `table_of_contents`, `header_footer`, or `footnote`. TXT and
 Markdown nodes remain `body`. For PDF, the deterministic domain classifier recognizes explicit
 Russian and English contents headings, common front-matter headings, and numbered part/chapter
 headings. It does not depend on `pdfplumber` or layout DTOs.
 
 The default application policy selects `body` and `front_matter` before chunking. Contents and
-page furniture remain available in the classified structure but do not reach the embedding API or
-Qdrant. A document with no eligible nodes fails explicitly. Selected chunks carry `content_role`,
+page furniture and footnotes remain available in the classified structure but do not reach the
+embedding API or Qdrant. A document with no eligible nodes fails explicitly. Selected chunks carry `content_role`,
 and Qdrant stores it for later filtering and diagnostics.
 
 ## Character chunking profile

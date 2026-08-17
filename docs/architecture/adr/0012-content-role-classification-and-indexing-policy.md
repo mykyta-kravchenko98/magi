@@ -16,15 +16,17 @@ a content decision to one storage technology.
 
 ## Decision
 
-Assign every `DocumentNode` one of four technology-independent roles:
+Assign every `DocumentNode` one of five technology-independent roles:
 
 - `body`;
 - `front_matter`;
 - `table_of_contents`;
-- `header_footer`.
+- `header_footer`;
+- `footnote`.
 
 All parsers produce `body` by default. The PDF adapter identifies page furniture from layout and
-retains it as `header_footer`. After normalization, a deterministic domain classifier recognizes
+retains it as `header_footer` and identifies conservative small-font footnotes as `footnote`.
+After normalization, a deterministic domain classifier recognizes
 Russian and English table-of-contents headings, common front-matter headings, and numbered
 part/chapter headings. `Часть/Part` and `Глава/Chapter` followed by a number or Roman numeral both
 start `body` content.
@@ -36,8 +38,9 @@ provenance and therefore cannot alter Markdown or TXT headings. Both enrichment 
 classification use only normalized nodes and page provenance; neither imports a PDF library.
 
 The application-owned indexing policy selects `body` and `front_matter` before chunking. It keeps
-`table_of_contents` and `header_footer` in the classified source structure but does not send them
-to the embedding provider or Qdrant. The policy is explicit and replaceable at composition time.
+`table_of_contents`, `header_footer`, and `footnote` in the classified source structure but does
+not send them to the embedding provider or Qdrant. The policy is explicit and replaceable at
+composition time.
 
 `DocumentChunk`, the retrieval application DTOs, and the Qdrant payload carry `content_role`.
 Chunks never combine nodes with different roles.

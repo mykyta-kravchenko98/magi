@@ -25,6 +25,7 @@ The `PdfParser` adapter cleans positioned lines before classifying `DocumentNode
   punctuation-only page ornaments as page furniture;
 - identify unnumbered margin text repeated on at least two pages as page furniture when its font
   is not larger than ordinary body text;
+- mark isolated small reference numbers and a separated trailing small-font block as `footnote`;
 - merge consecutive same-level heading lines on one page when their visual gap is within the
   configured heading-join threshold;
 - preserve newline boundaries inside extracted prose paragraphs for the next stage.
@@ -33,12 +34,19 @@ The technology-independent `DeterministicDocumentNormalizer` performs PDF dehyph
 nodes carrying page provenance. It removes a hyphen followed by a physical line break between
 letters. It retains the hyphen when the complete hyphenated word also occurs intact in the same
 document, when the left fragment is an uppercase abbreviation, or when the right fragment is a
-known hyphenated particle. Normal whitespace collapsing then removes the remaining physical line
-breaks.
+known hyphenated particle. The representative Russian `бизнес-` compound prefix also retains its
+lexical hyphen.
+
+When a word is split between adjacent PDF paragraph nodes, the normalizer may look through only
+`footnote` and `header_footer` nodes on the same or immediately following page. It removes the
+fragment from the previous paragraph and moves the complete reconstructed word to the next body
+paragraph. This repairs page-boundary cases such as `исследова-` / `телям` without merging
+footnotes into body text or losing page provenance for the surrounding nodes. Normal whitespace
+collapsing then removes remaining physical line breaks.
 
 Code blocks are not dehyphenated. TXT and Markdown nodes do not receive PDF-specific
-dehyphenation. Page furniture is retained and marked for the content-role indexing policy defined
-separately by ADR 0012.
+dehyphenation. Page furniture and footnotes are retained with explicit roles for the content-role
+indexing policy defined separately by ADR 0012.
 
 ## Consequences
 
@@ -47,10 +55,14 @@ separately by ADR 0012.
   existing application-owned page provenance.
 - Parsed PDF paragraphs can contain physical newlines; normalized paragraphs retain the previous
   single-space prose contract.
+- Footnotes and their small standalone reference numbers remain in the parsed structure but are
+  excluded by the default indexing policy.
 - The behavior is reproducible and covered by synthetic multi-page PDF fixtures plus a dry-run on
   the representative 20-page book sample.
 - Dictionary-free dehyphenation can still make mistakes for a compound that is split at its only
-  occurrence. Corpus evaluation must precede expanding the heuristics.
+  occurrence. Corpus evaluation must precede expanding the small explicit prefix set.
+- Trailing small-font detection is conservative and does not claim to recover arbitrary scholarly
+  footnote layouts, endnotes, tables, or captions.
 - This changes parsing semantics. Existing searchable versions remain immutable; evaluation uses
   a newly uploaded document version and a complete reindex.
 - The separate content-role policy decides whether identified page furniture is eligible for
