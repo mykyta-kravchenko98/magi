@@ -108,6 +108,7 @@ class UploadDocumentHandler:
                     IndexChunk(
                         index=chunk.index,
                         content_type=chunk.content_type.value,
+                        content_role=chunk.content_role.value,
                         heading_path=chunk.heading_path,
                         text=chunk.text,
                         vector=vector,

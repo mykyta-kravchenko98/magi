@@ -108,4 +108,5 @@ The current architectural target is the data-upload walking skeleton. See:
 - [Architecture Decision Records](docs/architecture/adr/README.md)
 - [Local embedding server on RTX 4080](docs/development/embedding-server.md)
 - [Embedding and Qdrant adapters](docs/development/embedding-qdrant-adapters.md)
+- [PDF normalization similarity baseline](docs/development/similarity-baseline.md)
 - [Persistence adapter integration tests](docs/development/persistence-integration-tests.md)

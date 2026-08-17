@@ -39,6 +39,47 @@ def test_normalizer_preserves_code_indentation_and_internal_blank_lines() -> Non
     assert normalized.nodes == (CodeBlock(text="\tcall()\n\n  next()", language="py"),)
 
 
+def test_normalizer_dehyphenates_pdf_line_breaks_and_preserves_known_compounds() -> None:
+    first_page = SourceLocation(page_number=1)
+    second_page = SourceLocation(page_number=2)
+    document = ParsedDocument(
+        nodes=(
+            Paragraph(
+                text="Domain-driven design is a known compound.",
+                source_location=first_page,
+            ),
+            Paragraph(
+                text="A represen-\ntation remains Domain-\ndriven.",
+                source_location=second_page,
+            ),
+        )
+    )
+
+    normalized = DeterministicDocumentNormalizer().normalize(document)
+
+    assert normalized.nodes == (
+        Paragraph(
+            text="Domain-driven design is a known compound.",
+            source_location=first_page,
+        ),
+        Paragraph(
+            text="A representation remains Domain-driven.",
+            source_location=second_page,
+        ),
+    )
+
+
+def test_normalizer_does_not_dehyphenate_non_pdf_line_breaks() -> None:
+    location = SourceLocation(line_start=1, line_end=2)
+    document = ParsedDocument(
+        nodes=(Paragraph(text="author-provided-\nbreak", source_location=location),)
+    )
+
+    normalized = DeterministicDocumentNormalizer().normalize(document)
+
+    assert normalized.nodes == (Paragraph(text="author-provided- break", source_location=location),)
+
+
 def test_normalizer_removes_empty_nodes_but_retains_nonempty_content() -> None:
     document = ParsedDocument(
         nodes=(Heading(level=1, text="  "), Paragraph(text=""), Paragraph(text="kept"))

@@ -31,6 +31,7 @@ class DocumentVersionIndexingService:
                 document_version_id=document_version_id,
                 chunk_index=chunk.index,
                 content_type=chunk.content_type,
+                content_role=chunk.content_role,
                 heading_path=chunk.heading_path,
                 text=chunk.text,
                 vector=chunk.vector,

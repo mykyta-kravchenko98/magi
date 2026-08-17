@@ -10,10 +10,16 @@ from magi.documents.application import (
 )
 from magi.documents.infrastructure import MinioObjectStorage, create_minio_client
 from magi.documents.infrastructure.persistence import SqlAlchemyUnitOfWork
-from magi.ingestion.application import DocumentEmbeddingService, TextDocumentPipeline
+from magi.ingestion.application import (
+    DocumentEmbeddingService,
+    IndexingContentPolicy,
+    TextDocumentPipeline,
+)
 from magi.ingestion.domain import (
     CharacterChunkingConfig,
     DeterministicDocumentNormalizer,
+    DeterministicDocumentRoleClassifier,
+    DeterministicDocumentStructureEnricher,
     StructureAwareCharacterChunker,
 )
 from magi.ingestion.infrastructure import (
@@ -66,6 +72,9 @@ def create_application_runtime(
     content_pipeline = TextDocumentPipeline(
         parser=parser,
         normalizer=DeterministicDocumentNormalizer(),
+        structure_enricher=DeterministicDocumentStructureEnricher(),
+        role_classifier=DeterministicDocumentRoleClassifier(),
+        indexing_policy=IndexingContentPolicy(),
         chunker=StructureAwareCharacterChunker(
             CharacterChunkingConfig(
                 max_chars=settings.chunk_max_chars,

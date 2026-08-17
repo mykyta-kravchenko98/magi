@@ -203,6 +203,7 @@ class QdrantVectorIndex:
             "document_version_id": str(point.document_version_id),
             "chunk_index": point.chunk_index,
             "content_type": point.content_type,
+            "content_role": point.content_role,
             "heading_path": list(point.heading_path),
             "text": point.text,
         }

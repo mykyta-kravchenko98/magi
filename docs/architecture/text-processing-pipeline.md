@@ -3,7 +3,8 @@
 The transport- and provider-independent ingestion pipeline is implemented in `magi.ingestion`:
 
 ```text
-source bytes -> parse -> normalize -> character chunking -> DocumentChunk[]
+source bytes -> parse -> normalize -> enrich structure -> classify roles
+             -> select indexable nodes -> character chunking -> DocumentChunk[]
 ```
 
 Domain and application code deliberately have no imports from FastAPI, Pydantic, SQLAlchemy,
@@ -31,13 +32,18 @@ extractable text layer produce stable pipeline errors.
 
 `PdfParser` uses `pdfplumber` word coordinates, font names, and font sizes. Its immutable
 `PdfExtractionProfile` controls line tolerance, paragraph gaps, indentation, heading thresholds,
-and recognized monospace font names.
+heading-line joining, page-furniture candidates, and recognized monospace font names.
 
 - words are grouped into lines by vertical center and sorted left-to-right;
+- bare page numbers, numbered running titles, short page ornaments, and repeated low-emphasis
+  headers/footers are identified in configurable page-edge candidates and retained with the
+  `header_footer` role;
 - ordinary consecutive lines become paragraphs; visual gaps and new list markers create a new
   paragraph;
 - sufficiently large or bold short lines become headings, with levels derived from descending
   heading font sizes across the document;
+- adjacent same-level heading lines on one page are merged when their visual gap is within the
+  configured threshold;
 - lines dominated by configured monospace fonts become atomic code blocks; relative x-offsets
   reconstruct leading indentation approximately;
 - uncertain content remains a paragraph;
@@ -45,15 +51,40 @@ and recognized monospace font names.
 - chunks may cross pages and retain inclusive `page_start`/`page_end` provenance.
 
 The current reading-order heuristic targets ordinary single-column born-digital documents.
-Multi-column layout, tables, repeated header/footer removal, rotated text, and perfect code
+Multi-column layout, tables, rotated text, arbitrary page ornaments, and perfect code
 reconstruction require representative fixtures before expanding the extraction profile.
 
 ## Normalization
 
 Normalization is deterministic: Unicode is converted to NFC, prose whitespace is collapsed,
-and empty nodes are removed. Code indentation and internal blank lines are retained; newline
-forms and trailing whitespace are normalized. A document with no paragraph or non-empty code
-content is rejected with `NoTextContentError`.
+and empty nodes are removed. Before whitespace collapsing, PDF prose removes hyphens that occur
+at physical line breaks between letters. A known hyphenated form found elsewhere in the document,
+an uppercase abbreviation, or a hyphenated particle preserves the hyphen. This behavior applies
+only to nodes carrying PDF page provenance; TXT, Markdown, and code are unaffected.
+
+Code indentation and internal blank lines are retained; newline forms and trailing whitespace are
+normalized. A document with no paragraph or non-empty code content is rejected with
+`NoTextContentError`.
+
+## Structure enrichment
+
+After text normalization, a deterministic domain service composes split PDF book headings. An
+exact numbered `Часть/Part` or `Глава/Chapter` label is joined with the immediately following
+heading when both occur on the same page. The title heading's level is retained, producing paths
+such as `ЧАСТЬ I — Стратегическое проектирование` / `ГЛАВА 1 — Анализ предметной области` without
+guessing from table-of-contents page ranges. Nodes without PDF page provenance are unchanged.
+
+## Content roles and indexing selection
+
+Every node carries `body`, `front_matter`, `table_of_contents`, or `header_footer`. TXT and
+Markdown nodes remain `body`. For PDF, the deterministic domain classifier recognizes explicit
+Russian and English contents headings, common front-matter headings, and numbered part/chapter
+headings. It does not depend on `pdfplumber` or layout DTOs.
+
+The default application policy selects `body` and `front_matter` before chunking. Contents and
+page furniture remain available in the classified structure but do not reach the embedding API or
+Qdrant. A document with no eligible nodes fails explicitly. Selected chunks carry `content_role`,
+and Qdrant stores it for later filtering and diagnostics.
 
 ## Character chunking profile
 
@@ -65,7 +96,8 @@ explicit interim profile and is not the token-aware `v1` profile described by AD
 - oversized prose is split at sentence, then word, then hard character boundaries;
 - overlap is used only between pieces of the same oversized paragraph;
 - code blocks are never split and raise `ContentBlockTooLargeError` above `max_chars`;
-- chunk indexes, content types, source spans, and output order are deterministic.
+- chunk indexes, content types, content roles, source spans, and output order are deterministic;
+- chunks never combine nodes with different content roles.
 
 Tokenizer-aware sizing remains deferred. OCR is also deferred: image-only/scanned PDFs fail with
 `PdfNoExtractableTextError`; Tesseract or another OCR engine belongs in a separate adapter and
@@ -98,19 +130,24 @@ The domain separates immutable values from stateless policies:
 ```text
 ingestion/domain/value_objects/source_location.py      # source provenance
 ingestion/domain/value_objects/document_structure.py   # parsed nodes/document
+ingestion/domain/value_objects/content_role.py         # semantic node/chunk role
 ingestion/domain/value_objects/document_chunk.py       # chunk output
 ingestion/domain/value_objects/chunking_profile.py     # immutable limits
 ingestion/domain/services/interfaces/document_normalizer.py # normalization contract
+ingestion/domain/services/interfaces/document_structure_enricher.py # enrichment contract
+ingestion/domain/services/interfaces/document_role_classifier.py # role contract
 ingestion/domain/services/interfaces/document_chunker.py    # chunking contract
 ingestion/domain/services/deterministic_document_normalizer.py # normalization policy
+ingestion/domain/services/deterministic_document_structure_enricher.py # heading composition
+ingestion/domain/services/deterministic_document_role_classifier.py # role policy
 ingestion/domain/services/structure_aware_chunker.py   # chunking policy
 ```
 
 These value objects are transient domain concepts; they do not require relational persistence or
 ORM models. Domain services transform them deterministically without owning identity or state.
-`TextDocumentPipeline` depends on the `DocumentNormalizer` and `DocumentChunker` protocols, so
-bootstrap can replace either strategy without changing the application workflow. The current
-implementations are `DeterministicDocumentNormalizer` and `StructureAwareCharacterChunker`.
+`TextDocumentPipeline` depends on protocols for normalization, structure enrichment, role
+classification, and chunking, so bootstrap can replace any strategy without changing the
+application workflow. The current implementations are deterministic domain services.
 
 Run its focused checks with:
 

@@ -8,6 +8,7 @@ from magi.ingestion.domain.value_objects import (
     CharacterChunkingConfig,
     ChunkContentType,
     CodeBlock,
+    ContentRole,
     DocumentChunk,
     Heading,
     Paragraph,
@@ -23,6 +24,7 @@ class _Unit:
     text: str
     content_type: ChunkContentType
     location: SourceLocation | None
+    content_role: ContentRole
 
 
 def _choose_break(text: str, start: int, limit: int) -> int:
@@ -96,6 +98,7 @@ class StructureAwareCharacterChunker:
         chunks: list[DocumentChunk] = []
         heading_levels: list[tuple[int, str]] = []
         pending: list[_Unit] = []
+        active_role = ContentRole.BODY
 
         def heading_path() -> tuple[str, ...]:
             return tuple(text for _, text in heading_levels)
@@ -110,6 +113,7 @@ class StructureAwareCharacterChunker:
                     text="\n\n".join(unit.text for unit in units),
                     heading_path=heading_path(),
                     content_type=_content_type(units),
+                    content_role=units[0].content_role,
                     source_line_start=line_start,
                     source_line_end=line_end,
                     page_start=page_start,
@@ -125,6 +129,7 @@ class StructureAwareCharacterChunker:
         for node in document.nodes:
             if isinstance(node, Heading):
                 flush()
+                active_role = node.content_role
                 heading_levels = [item for item in heading_levels if item[0] < node.level]
                 heading_levels.append((node.level, node.text))
                 continue
@@ -132,6 +137,9 @@ class StructureAwareCharacterChunker:
             content_type = (
                 ChunkContentType.CODE if isinstance(node, CodeBlock) else ChunkContentType.TEXT
             )
+            if pending and node.content_role is not active_role:
+                flush()
+            active_role = node.content_role
             if isinstance(node, CodeBlock) and len(node.text) > self._config.max_chars:
                 raise ContentBlockTooLargeError(
                     f"code block has {len(node.text)} characters; limit is {self._config.max_chars}"
@@ -139,10 +147,10 @@ class StructureAwareCharacterChunker:
             if isinstance(node, Paragraph) and len(node.text) > self._config.max_chars:
                 flush()
                 for piece in _split_paragraph(node.text, self._config):
-                    emit([_Unit(piece, content_type, node.source_location)])
+                    emit([_Unit(piece, content_type, node.source_location, active_role)])
                 continue
 
-            unit = _Unit(node.text, content_type, node.source_location)
+            unit = _Unit(node.text, content_type, node.source_location, active_role)
             candidate_length = sum(len(item.text) for item in pending) + len(unit.text)
             if pending:
                 candidate_length += 2 * len(pending)

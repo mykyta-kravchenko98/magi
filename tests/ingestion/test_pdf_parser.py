@@ -9,12 +9,16 @@ from reportlab.pdfgen.canvas import Canvas
 from magi.ingestion.application import (
     DocumentFormatParser,
     DocumentParser,
+    IndexingContentPolicy,
     TextDocumentPipeline,
 )
 from magi.ingestion.domain import (
     CharacterChunkingConfig,
     CodeBlock,
+    ContentRole,
     DeterministicDocumentNormalizer,
+    DeterministicDocumentRoleClassifier,
+    DeterministicDocumentStructureEnricher,
     Heading,
     Paragraph,
     PdfEncryptedError,
@@ -91,6 +95,45 @@ def make_pdf_with_empty_middle_page() -> bytes:
     return output.getvalue()
 
 
+def make_pdf_requiring_normalization() -> bytes:
+    output = BytesIO()
+    pdf = Canvas(output, pagesize=letter)
+
+    pdf.setFont("Helvetica", 9)
+    pdf.drawString(72, 770, "16 | Sample Book")
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawString(72, 720, "Normalization for")
+    pdf.drawString(72, 696, "Technical Books")
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(72, 650, "A represen-")
+    pdf.drawString(72, 636, "tation should be reconstructed.")
+    pdf.drawString(72, 610, "Domain-driven design is a known compound.")
+    pdf.drawString(72, 30, "2024")
+
+    pdf.showPage()
+    pdf.setFont("Helvetica", 9)
+    pdf.drawRightString(540, 770, "Sample Book | 17")
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(72, 700, "Domain-")
+    pdf.drawString(72, 686, "driven design keeps its lexical hyphen.")
+    pdf.save()
+    return output.getvalue()
+
+
+def make_pdf_with_repeated_page_furniture() -> bytes:
+    output = BytesIO()
+    pdf = Canvas(output, pagesize=letter)
+    for page_number in range(1, 3):
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(72, 770, "Technical Books")
+        pdf.drawString(72, 30, "Confidential")
+        pdf.setFont("Helvetica", 11)
+        pdf.drawString(72, 700, f"Unique body on page {page_number}.")
+        pdf.showPage()
+    pdf.save()
+    return output.getvalue()
+
+
 def test_pdf_parser_extracts_all_node_types_and_page_provenance() -> None:
     document = PdfParser().parse(make_structured_pdf())
 
@@ -124,8 +167,51 @@ def test_pdf_parser_joins_wrapped_lines_but_splits_list_items() -> None:
     paragraphs = [node for node in document.nodes if isinstance(node, Paragraph)]
 
     assert paragraphs[0].text.endswith("coordinate their work.")
-    assert paragraphs[2].text == "- First capability continues on the following visual line."
+    assert paragraphs[2].text == "- First capability continues on\nthe following visual line."
     assert paragraphs[3].text == "- Second capability is independent."
+
+
+def test_pdf_parser_marks_page_furniture_and_merges_wrapped_headings() -> None:
+    parsed = PdfParser().parse(make_pdf_requiring_normalization())
+
+    headings = [node for node in parsed.nodes if isinstance(node, Heading)]
+    paragraphs = [node for node in parsed.nodes if isinstance(node, Paragraph)]
+
+    assert [heading.text for heading in headings] == ["Normalization for Technical Books"]
+    furniture = [node for node in parsed.nodes if node.content_role is ContentRole.HEADER_FOOTER]
+    assert [node.text for node in furniture] == ["16 | Sample Book", "Sample Book | 17"]
+    assert any("represen-\ntation" in paragraph.text for paragraph in paragraphs)
+    assert any(paragraph.text == "2024" for paragraph in paragraphs)
+
+    normalized = DeterministicDocumentNormalizer().normalize(parsed)
+
+    normalized_text = "\n".join(node.text for node in normalized.nodes)
+    assert "representation should be reconstructed" in normalized_text
+    assert "Domain-driven design keeps its lexical hyphen" in normalized_text
+    assert [
+        node.text for node in normalized.nodes if node.content_role is ContentRole.HEADER_FOOTER
+    ] == ["16 | Sample Book", "Sample Book | 17"]
+
+
+def test_pdf_parser_marks_repeated_unnumbered_headers_and_footers() -> None:
+    parsed = PdfParser().parse(make_pdf_with_repeated_page_furniture())
+
+    assert [node.text for node in parsed.nodes] == [
+        "Technical Books",
+        "Unique body on page 1.",
+        "Confidential",
+        "Technical Books",
+        "Unique body on page 2.",
+        "Confidential",
+    ]
+    assert [node.content_role for node in parsed.nodes] == [
+        ContentRole.HEADER_FOOTER,
+        ContentRole.BODY,
+        ContentRole.HEADER_FOOTER,
+        ContentRole.HEADER_FOOTER,
+        ContentRole.BODY,
+        ContentRole.HEADER_FOOTER,
+    ]
 
 
 def test_pdf_parser_is_deterministic() -> None:
@@ -158,6 +244,9 @@ def test_pdf_pipeline_can_be_composed_without_application_importing_pdfplumber()
     pipeline = TextDocumentPipeline(
         parser=parser,
         normalizer=DeterministicDocumentNormalizer(),
+        structure_enricher=DeterministicDocumentStructureEnricher(),
+        role_classifier=DeterministicDocumentRoleClassifier(),
+        indexing_policy=IndexingContentPolicy(),
         chunker=StructureAwareCharacterChunker(
             CharacterChunkingConfig(max_chars=100, overlap_chars=0)
         ),
@@ -204,8 +293,11 @@ def test_pdf_parser_rejects_image_only_or_blank_pdf() -> None:
     [
         lambda: PdfExtractionProfile(line_tolerance_ratio=0),
         lambda: PdfExtractionProfile(paragraph_gap_ratio=-1),
+        lambda: PdfExtractionProfile(heading_join_gap_ratio=0),
         lambda: PdfExtractionProfile(code_char_width_ratio=0),
         lambda: PdfExtractionProfile(max_heading_chars=0),
+        lambda: PdfExtractionProfile(page_furniture_candidate_lines=0),
+        lambda: PdfExtractionProfile(page_furniture_min_repetitions=1),
         lambda: PdfExtractionProfile(code_font_markers=()),
     ],
 )

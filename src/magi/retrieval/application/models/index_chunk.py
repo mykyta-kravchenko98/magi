@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from magi.retrieval.application.models.vector_content_role import VectorContentRole
 from magi.retrieval.application.models.vector_content_type import VectorContentType
 
 
@@ -9,6 +10,7 @@ from magi.retrieval.application.models.vector_content_type import VectorContentT
 class IndexChunk:
     index: int
     content_type: VectorContentType
+    content_role: VectorContentRole
     heading_path: tuple[str, ...]
     text: str
     vector: tuple[float, ...]

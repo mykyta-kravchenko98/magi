@@ -5,6 +5,7 @@ from magi.ingestion.domain import (
     ChunkContentType,
     CodeBlock,
     ContentBlockTooLargeError,
+    ContentRole,
     DocumentChunker,
     Heading,
     Paragraph,
@@ -63,6 +64,20 @@ def test_chunks_never_cross_heading_boundaries_and_track_hierarchy() -> None:
         ("Chapter",),
         ("Chapter", "Deep"),
         ("Chapter", "Next"),
+    ]
+
+
+def test_chunks_carry_role_and_never_mix_role_boundaries() -> None:
+    chunks = chunk(
+        Paragraph(text="preface", content_role=ContentRole.FRONT_MATTER),
+        Paragraph(text="chapter", content_role=ContentRole.BODY),
+        max_chars=100,
+    )
+
+    assert [item.text for item in chunks] == ["preface", "chapter"]
+    assert [item.content_role for item in chunks] == [
+        ContentRole.FRONT_MATTER,
+        ContentRole.BODY,
     ]
 
 
