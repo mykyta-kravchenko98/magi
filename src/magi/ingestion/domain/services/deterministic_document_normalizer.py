@@ -3,10 +3,12 @@
 import re
 import unicodedata
 from collections.abc import Set
+from dataclasses import replace
 
 from magi.ingestion.domain.errors import NoTextContentError
 from magi.ingestion.domain.value_objects import (
     CodeBlock,
+    ContentRole,
     DocumentNode,
     Heading,
     Paragraph,
@@ -20,6 +22,10 @@ _PDF_LINE_BREAK_HYPHEN = re.compile(
 )
 _HYPHENATED_WORD = re.compile(rf"(?<!{_LETTER}){_LETTER}+-{_LETTER}+(?!{_LETTER})")
 _HYPHENATED_PARTICLES = frozenset({"ка", "либо", "нибудь", "таки", "то"})
+_PRESERVED_HYPHEN_LEFT_PARTS = frozenset({"бизнес"})
+_PDF_NODE_BOUNDARY_LEFT = re.compile(rf"(?P<left>{_LETTER}+)-\s*$")
+_PDF_NODE_BOUNDARY_RIGHT = re.compile(rf"^\s*(?P<right>{_LETTER}+)")
+_TRANSPARENT_PDF_ROLES = frozenset({ContentRole.FOOTNOTE, ContentRole.HEADER_FOOTER})
 
 
 def _known_hyphenated_words(document: ParsedDocument) -> frozenset[str]:
@@ -33,20 +39,84 @@ def _known_hyphenated_words(document: ParsedDocument) -> frozenset[str]:
     return frozenset(words)
 
 
-def _dehyphenate_pdf_line_breaks(text: str, known_words: Set[str]) -> str:
-    def replace(match: re.Match[str]) -> str:
-        left = match.group("left")
-        right = match.group("right")
-        hyphenated = f"{left}-{right}"
-        if (
-            hyphenated.casefold() in known_words
-            or left.isupper()
-            or right.casefold() in _HYPHENATED_PARTICLES
-        ):
-            return hyphenated
-        return f"{left}{right}"
+def _joined_pdf_word(left: str, right: str, known_words: Set[str]) -> str:
+    hyphenated = f"{left}-{right}"
+    if (
+        hyphenated.casefold() in known_words
+        or left.isupper()
+        or left.casefold() in _PRESERVED_HYPHEN_LEFT_PARTS
+        or right.casefold() in _HYPHENATED_PARTICLES
+    ):
+        return hyphenated
+    return f"{left}{right}"
 
-    return _PDF_LINE_BREAK_HYPHEN.sub(replace, text)
+
+def _dehyphenate_pdf_line_breaks(text: str, known_words: Set[str]) -> str:
+    def replace_line_break(match: re.Match[str]) -> str:
+        return _joined_pdf_word(
+            match.group("left"),
+            match.group("right"),
+            known_words,
+        )
+
+    return _PDF_LINE_BREAK_HYPHEN.sub(replace_line_break, text)
+
+
+def _is_pdf_paragraph(node: DocumentNode) -> bool:
+    return (
+        isinstance(node, Paragraph)
+        and node.source_location is not None
+        and node.source_location.page_number is not None
+    )
+
+
+def _repair_pdf_node_boundary_hyphenation(
+    document: ParsedDocument,
+    known_words: Set[str],
+) -> ParsedDocument:
+    nodes = list(document.nodes)
+    previous_index: int | None = None
+
+    for index, current in enumerate(nodes):
+        if current.content_role in _TRANSPARENT_PDF_ROLES:
+            continue
+        if not _is_pdf_paragraph(current):
+            previous_index = None
+            continue
+        if previous_index is not None:
+            previous = nodes[previous_index]
+            assert isinstance(previous, Paragraph)
+            assert previous.source_location is not None
+            assert current.source_location is not None
+            previous_page = previous.source_location.page_number
+            current_page = current.source_location.page_number
+            assert previous_page is not None
+            assert current_page is not None
+            left_match = _PDF_NODE_BOUNDARY_LEFT.search(previous.text)
+            right_match = _PDF_NODE_BOUNDARY_RIGHT.match(current.text)
+            if (
+                current.content_role is previous.content_role
+                and current_page in {previous_page, previous_page + 1}
+                and left_match is not None
+                and right_match is not None
+            ):
+                joined_word = _joined_pdf_word(
+                    left_match.group("left"),
+                    right_match.group("right"),
+                    known_words,
+                )
+                nodes[previous_index] = replace(
+                    previous,
+                    text=previous.text[: left_match.start()].rstrip(),
+                )
+                current = replace(
+                    current,
+                    text=f"{joined_word}{current.text[right_match.end() :]}",
+                )
+                nodes[index] = current
+        previous_index = index
+
+    return ParsedDocument(nodes=tuple(nodes))
 
 
 def _normalize_prose(
@@ -74,7 +144,11 @@ class DeterministicDocumentNormalizer:
     def normalize(self, document: ParsedDocument) -> ParsedDocument:
         nodes: list[DocumentNode] = []
         pdf_hyphenated_words = _known_hyphenated_words(document)
-        for node in document.nodes:
+        repaired = _repair_pdf_node_boundary_hyphenation(
+            document,
+            pdf_hyphenated_words,
+        )
+        for node in repaired.nodes:
             is_pdf_node = (
                 node.source_location is not None and node.source_location.page_number is not None
             )

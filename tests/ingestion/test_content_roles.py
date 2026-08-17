@@ -28,6 +28,11 @@ def test_pdf_roles_follow_toc_and_book_section_boundaries() -> None:
                 source_location=pdf_location(3),
                 content_role=ContentRole.HEADER_FOOTER,
             ),
+            Paragraph(
+                text="1 Footnote",
+                source_location=pdf_location(3),
+                content_role=ContentRole.FOOTNOTE,
+            ),
             Heading(
                 level=1,
                 text="Предисловие редакторской группы",
@@ -46,6 +51,7 @@ def test_pdf_roles_follow_toc_and_book_section_boundaries() -> None:
         ContentRole.TABLE_OF_CONTENTS,
         ContentRole.TABLE_OF_CONTENTS,
         ContentRole.HEADER_FOOTER,
+        ContentRole.FOOTNOTE,
         ContentRole.FRONT_MATTER,
         ContentRole.FRONT_MATTER,
         ContentRole.BODY,

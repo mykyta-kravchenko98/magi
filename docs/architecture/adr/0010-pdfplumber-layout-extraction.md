@@ -26,6 +26,8 @@ The adapter reconstructs lines from positioned words and applies an immutable, c
 - large or sufficiently bold short lines are headings;
 - lines dominated by known monospace fonts are code;
 - list markers, visual gaps, and indentation separate paragraphs;
+- the representative book's leading `(cid:2)` placeholder is canonicalized to `•` before list
+  boundary detection; arbitrary CID values and inline occurrences are preserved;
 - uncertain content is a paragraph;
 - every node retains its one-based page number.
 
@@ -40,6 +42,8 @@ the application parser registry by the composition root.
 - Relative code indentation is reconstructed approximately from x-coordinates.
 - Current reading order is suitable for ordinary single-column PDFs; columns, tables, rotated
   text, repeated headers/footers, and OCR require separately tested profile evolution.
+- CID identifiers are font-local. The accepted mapping is deliberately limited to the observed
+  leading `(cid:2)` list marker and must not become a global `(cid:N)` substitution table.
 - Changing the library version or extraction thresholds changes parsing semantics and requires a
   new processing profile plus reindexing.
 

@@ -134,6 +134,36 @@ def make_pdf_with_repeated_page_furniture() -> bytes:
     return output.getvalue()
 
 
+def make_pdf_with_cid_list_markers() -> bytes:
+    output = BytesIO()
+    pdf = Canvas(output, pagesize=letter)
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(72, 700, "Introductory paragraph.")
+    pdf.drawString(72, 670, "(cid:2) First capability continues on")
+    pdf.drawString(84, 656, "the following visual line.")
+    pdf.drawString(72, 630, "(cid:2) Second capability is independent.")
+    pdf.drawString(72, 600, "Literal inline (cid:2) text remains unchanged.")
+    pdf.save()
+    return output.getvalue()
+
+
+def make_pdf_with_footnotes() -> bytes:
+    output = BytesIO()
+    pdf = Canvas(output, pagesize=letter)
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(72, 700, "Body before the reference.")
+    pdf.setFont("Helvetica", 6)
+    pdf.drawString(200, 686, "2")
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(72, 670, "Body after the reference.")
+    pdf.setFont("Helvetica", 6)
+    pdf.drawString(72, 100, "2")
+    pdf.setFont("Helvetica", 8.5)
+    pdf.drawString(84, 88, "A trailing explanatory footnote.")
+    pdf.save()
+    return output.getvalue()
+
+
 def test_pdf_parser_extracts_all_node_types_and_page_provenance() -> None:
     document = PdfParser().parse(make_structured_pdf())
 
@@ -169,6 +199,29 @@ def test_pdf_parser_joins_wrapped_lines_but_splits_list_items() -> None:
     assert paragraphs[0].text.endswith("coordinate their work.")
     assert paragraphs[2].text == "- First capability continues on\nthe following visual line."
     assert paragraphs[3].text == "- Second capability is independent."
+
+
+def test_pdf_parser_normalizes_leading_cid_2_as_list_marker() -> None:
+    document = PdfParser().parse(make_pdf_with_cid_list_markers())
+    paragraphs = [node for node in document.nodes if isinstance(node, Paragraph)]
+
+    assert [paragraph.text for paragraph in paragraphs] == [
+        "Introductory paragraph.",
+        "• First capability continues on\nthe following visual line.",
+        "• Second capability is independent.",
+        "Literal inline (cid:2) text remains unchanged.",
+    ]
+
+
+def test_pdf_parser_separates_small_references_and_trailing_footnotes() -> None:
+    document = PdfParser().parse(make_pdf_with_footnotes())
+
+    assert [(node.text, node.content_role) for node in document.nodes] == [
+        ("Body before the reference.", ContentRole.BODY),
+        ("2", ContentRole.FOOTNOTE),
+        ("Body after the reference.", ContentRole.BODY),
+        ("2\nA trailing explanatory footnote.", ContentRole.FOOTNOTE),
+    ]
 
 
 def test_pdf_parser_marks_page_furniture_and_merges_wrapped_headings() -> None:
@@ -294,6 +347,8 @@ def test_pdf_parser_rejects_image_only_or_blank_pdf() -> None:
         lambda: PdfExtractionProfile(line_tolerance_ratio=0),
         lambda: PdfExtractionProfile(paragraph_gap_ratio=-1),
         lambda: PdfExtractionProfile(heading_join_gap_ratio=0),
+        lambda: PdfExtractionProfile(footnote_size_ratio=0),
+        lambda: PdfExtractionProfile(footnote_gap_ratio=0),
         lambda: PdfExtractionProfile(code_char_width_ratio=0),
         lambda: PdfExtractionProfile(max_heading_chars=0),
         lambda: PdfExtractionProfile(page_furniture_candidate_lines=0),

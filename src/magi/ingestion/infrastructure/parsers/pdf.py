@@ -27,6 +27,8 @@ from magi.ingestion.domain import (
 )
 
 _LIST_MARKER = re.compile(r"^(?:[\u2022\u25cf\u25aa\u25e6*+-]|\d+[.)])\s+")
+_CID_LIST_MARKER = "(cid:2)"
+_CANONICAL_LIST_MARKER = "\u2022"
 _PAGE_NUMBER = re.compile(r"^\d+$")
 _NUMBERED_PAGE_FURNITURE = re.compile(r"^(?:\d+\s*\|\s*\S.*|\S.*\s*\|\s*\d+)$")
 _DECORATIVE_PAGE_FURNITURE = re.compile(r"^[^\w]+$")
@@ -55,6 +57,8 @@ class PdfExtractionProfile:
     heading_size_ratio: float = 1.2
     bold_heading_size_ratio: float = 1.08
     heading_join_gap_ratio: float = 0.75
+    footnote_size_ratio: float = 0.85
+    footnote_gap_ratio: float = 1.0
     code_char_width_ratio: float = 0.6
     max_heading_chars: int = 200
     page_furniture_candidate_lines: int = 2
@@ -78,6 +82,8 @@ class PdfExtractionProfile:
             self.heading_size_ratio,
             self.bold_heading_size_ratio,
             self.heading_join_gap_ratio,
+            self.footnote_size_ratio,
+            self.footnote_gap_ratio,
             self.code_char_width_ratio,
         )
         if any(value <= 0 for value in positive_values):
@@ -169,7 +175,10 @@ def _make_line(
     profile: PdfExtractionProfile,
 ) -> _Line:
     ordered = sorted(words, key=lambda word: word.x0)
-    text = " ".join(word.text for word in ordered)
+    word_texts = [word.text for word in ordered]
+    if len(word_texts) > 1 and word_texts[0] == _CID_LIST_MARKER:
+        word_texts[0] = _CANONICAL_LIST_MARKER
+    text = " ".join(word_texts)
     weights = [len(word.text) for word in ordered]
     weighted_size = sum(word.size * weight for word, weight in zip(ordered, weights, strict=True))
     return _Line(
@@ -288,6 +297,43 @@ def _page_furniture_by_page(
     return tuple(furniture_by_page)
 
 
+def _footnote_indexes(
+    lines: Sequence[_Line],
+    furniture_indexes: frozenset[int],
+    body_size: float,
+    profile: PdfExtractionProfile,
+) -> frozenset[int]:
+    maximum_size = body_size * profile.footnote_size_ratio
+    references = {
+        index
+        for index, line in enumerate(lines)
+        if index not in furniture_indexes
+        and line.max_size <= maximum_size
+        and _PAGE_NUMBER.fullmatch(line.text.strip()) is not None
+    }
+    content_indexes = [index for index in range(len(lines)) if index not in furniture_indexes]
+    trailing: set[int] = set()
+    for index in reversed(content_indexes):
+        if lines[index].max_size > maximum_size:
+            break
+        trailing.add(index)
+    if trailing:
+        first_index = min(trailing)
+        previous_indexes = [index for index in content_indexes if index < first_index]
+        previous_index = previous_indexes[-1] if previous_indexes else None
+        gap = (
+            lines[first_index].top - lines[previous_index].bottom
+            if previous_index is not None
+            else float("inf")
+        )
+        has_prose = any(
+            _PAGE_NUMBER.fullmatch(lines[index].text.strip()) is None for index in trailing
+        )
+        if not has_prose or gap <= body_size * profile.footnote_gap_ratio:
+            trailing.clear()
+    return frozenset(references | trailing)
+
+
 def _is_heading(line: _Line, body_size: float, profile: PdfExtractionProfile) -> bool:
     if _LIST_MARKER.match(line.text) or len(line.text) > profile.max_heading_chars:
         return False
@@ -331,10 +377,15 @@ def _starts_new_paragraph(
     return indentation_changed and not paragraph_is_list_item
 
 
-def _paragraph(lines: Sequence[_Line]) -> Paragraph:
+def _paragraph(
+    lines: Sequence[_Line],
+    *,
+    content_role: ContentRole = ContentRole.BODY,
+) -> Paragraph:
     return Paragraph(
         text="\n".join(line.text for line in lines),
         source_location=SourceLocation(page_number=lines[0].page_number),
+        content_role=content_role,
     )
 
 
@@ -355,6 +406,7 @@ def _code_block(lines: Sequence[_Line], profile: PdfExtractionProfile) -> CodeBl
 def _classify_page(
     lines: Sequence[_Line],
     furniture_indexes: frozenset[int],
+    footnote_indexes: frozenset[int],
     body_size: float,
     heading_sizes: Sequence[float],
     profile: PdfExtractionProfile,
@@ -362,6 +414,7 @@ def _classify_page(
     nodes: list[DocumentNode] = []
     paragraph_lines: list[_Line] = []
     code_lines: list[_Line] = []
+    footnote_lines: list[_Line] = []
     previous_heading_line: _Line | None = None
 
     def flush_paragraph() -> None:
@@ -376,10 +429,17 @@ def _classify_page(
             nodes.append(_code_block(code_lines, profile))
             code_lines = []
 
+    def flush_footnote() -> None:
+        nonlocal footnote_lines
+        if footnote_lines:
+            nodes.append(_paragraph(footnote_lines, content_role=ContentRole.FOOTNOTE))
+            footnote_lines = []
+
     for line_index, line in enumerate(lines):
         if line_index in furniture_indexes:
             flush_paragraph()
             flush_code()
+            flush_footnote()
             nodes.append(
                 Paragraph(
                     text=line.text,
@@ -389,6 +449,13 @@ def _classify_page(
             )
             previous_heading_line = None
             continue
+        if line_index in footnote_indexes:
+            flush_paragraph()
+            flush_code()
+            footnote_lines.append(line)
+            previous_heading_line = None
+            continue
+        flush_footnote()
         if _is_heading(line, body_size, profile):
             flush_paragraph()
             flush_code()
@@ -445,6 +512,7 @@ def _classify_page(
 
     flush_paragraph()
     flush_code()
+    flush_footnote()
     return tuple(nodes)
 
 
@@ -488,12 +556,19 @@ class PdfParser:
             raise PdfNoExtractableTextError("PDF has no meaningful text")
         body_size = _body_font_size(meaningful_lines)
         heading_sizes = _heading_sizes(meaningful_lines, body_size, self._profile)
+        footnotes_by_page = tuple(
+            _footnote_indexes(page_lines, furniture_indexes, body_size, self._profile)
+            for page_lines, furniture_indexes in zip(pages, furniture_by_page, strict=True)
+        )
         nodes = tuple(
             node
-            for page_lines, furniture_indexes in zip(pages, furniture_by_page, strict=True)
+            for page_lines, furniture_indexes, footnote_indexes in zip(
+                pages, furniture_by_page, footnotes_by_page, strict=True
+            )
             for node in _classify_page(
                 page_lines,
                 furniture_indexes,
+                footnote_indexes,
                 body_size,
                 heading_sizes,
                 self._profile,
