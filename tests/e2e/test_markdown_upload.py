@@ -24,9 +24,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "walking_skeleton.md"
 async def test_real_markdown_upload_becomes_searchable_and_exists_in_qdrant() -> None:
     api_base_url = os.getenv("MAGI_E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
     qdrant = QdrantSettings()  # pyright: ignore[reportCallIssue]
-    qdrant_headers = (
-        {"api-key": qdrant.api_key.get_secret_value()} if qdrant.api_key is not None else None
-    )
+    qdrant_headers = {"api-key": qdrant.api_key.get_secret_value()}
 
     async with (
         httpx.AsyncClient(timeout=180.0) as api_client,
