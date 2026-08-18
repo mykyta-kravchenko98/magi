@@ -111,6 +111,15 @@ Production images are published to ECR only after the `main` CI gate passes. The
 records the immutable ECR digest for local, reproducible Compose deployment; it performs no
 automatic deployment. See [AWS ECR publishing and local deployment](docs/deployment/aws-ecr.md).
 
+Deploy the pinned stage image, load `magi/stage`, authenticate to ECR, and start Compose with:
+
+```powershell
+make stage
+```
+
+The production image is rebuilt only when runtime or Docker build inputs change. CI quality and
+migration checks still run for other changes.
+
 The source tree follows the bounded contexts documented below. Each business module
 has explicit `domain`, `application`, and `infrastructure` packages; concrete
 dependencies are assembled only in `magi.bootstrap`.

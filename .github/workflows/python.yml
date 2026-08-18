@@ -15,6 +15,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect image changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      image: ${{ steps.filter.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect production image inputs
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            git ls-tree -r --name-only "$GITHUB_SHA" > changed-files.txt
+          else
+            git diff --name-only "$BASE_SHA" "$GITHUB_SHA" > changed-files.txt
+          fi
+          if grep -Eq '^(src/|pyproject\.toml$|uv\.lock$|Dockerfile$|\.dockerignore$|alembic\.ini$|README\.md$)' changed-files.txt; then
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=false" >> "$GITHUB_OUTPUT"
+          fi
+
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -99,8 +126,11 @@ jobs:
 
   publish:
     name: Publish production image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [required]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.image == 'true'
+    needs: [required, changes]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
