@@ -19,14 +19,10 @@ if ($LASTEXITCODE -ne 0) {
 
 $secretString = $secretOutput -join [Environment]::NewLine
 $secret = $secretString | ConvertFrom-Json
-if ($secret -is [array]) {
-    if ($secret.Count -ne 1) {
-        throw "Secrets Manager value must be a JSON object or a one-element array."
-    }
-    $secret = $secret[0]
-}
+
 $requiredNames = @(
     "MAGI_POSTGRES_PASSWORD",
+    "MAGI_DATABASE_URL",
     "MAGI_OBJECT_STORAGE_ACCESS_KEY",
     "MAGI_OBJECT_STORAGE_SECRET_KEY",
     "MAGI_QDRANT_API_KEY"
@@ -37,6 +33,11 @@ foreach ($name in $requiredNames) {
     if ($null -eq $property -or [string]::IsNullOrWhiteSpace([string]$property.Value)) {
         throw "Secrets Manager value is missing required string '$name'."
     }
+}
+
+$escapedPassword = [Regex]::Escape([string]$secret.MAGI_POSTGRES_PASSWORD)
+if ([string]$secret.MAGI_DATABASE_URL -notmatch ":${escapedPassword}@") {
+    throw "MAGI_DATABASE_URL does not contain MAGI_POSTGRES_PASSWORD."
 }
 
 foreach ($property in $secret.PSObject.Properties) {
