@@ -31,6 +31,7 @@ TEI embedding server, migrations, and the API:
 
 ```powershell
 Copy-Item .env.example .env
+# Replace every replace-with-* placeholder in .env with a different random value.
 docker compose --profile gpu up --build --detach --wait
 docker compose --profile gpu ps
 ```
@@ -105,6 +106,10 @@ uv run pytest
 uv build --no-sources
 docker build -t magi:local .
 ```
+
+Production images are published to ECR only after the `main` CI gate passes. The workflow
+records the immutable ECR digest for local, reproducible Compose deployment; it performs no
+automatic deployment. See [AWS ECR publishing and local deployment](docs/deployment/aws-ecr.md).
 
 The source tree follows the bounded contexts documented below. Each business module
 has explicit `domain`, `application`, and `infrastructure` packages; concrete

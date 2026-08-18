@@ -115,11 +115,7 @@ def create_application_runtime(
             vector_dimension=qdrant_settings.vector_dimension,
             batch_size=qdrant_settings.batch_size,
             timeout_seconds=qdrant_settings.timeout_seconds,
-            api_key=(
-                qdrant_settings.api_key.get_secret_value()
-                if qdrant_settings.api_key is not None
-                else None
-            ),
+            api_key=qdrant_settings.api_key.get_secret_value(),
         )
     )
     status_query_handler = GetDocumentAdditionStatusHandler(unit_of_work_factory)

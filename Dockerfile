@@ -3,6 +3,11 @@ FROM ghcr.io/astral-sh/uv:0.11.32 AS uv
 
 FROM python:3.13-slim AS runtime
 
+ARG VCS_REF="unknown"
+ARG BUILD_DATE="unknown"
+LABEL org.opencontainers.image.revision="$VCS_REF" \
+      org.opencontainers.image.created="$BUILD_DATE"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HOME="/app/.cache/huggingface" \

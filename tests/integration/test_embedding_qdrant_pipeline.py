@@ -53,11 +53,7 @@ async def test_real_tei_embeddings_are_idempotently_upserted_to_qdrant() -> None
         vector_dimension=qdrant_settings.vector_dimension,
         batch_size=2,
         timeout_seconds=qdrant_settings.timeout_seconds,
-        api_key=(
-            qdrant_settings.api_key.get_secret_value()
-            if qdrant_settings.api_key is not None
-            else None
-        ),
+        api_key=qdrant_settings.api_key.get_secret_value(),
     )
     qdrant_headers = (
         {"api-key": qdrant_config.api_key} if qdrant_config.api_key is not None else None

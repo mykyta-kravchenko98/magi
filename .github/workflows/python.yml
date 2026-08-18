@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+    paths-ignore:
+      - deploy/stage.env
 
 permissions:
   contents: read
@@ -94,3 +96,106 @@ jobs:
         run: |
           test "$QUALITY_RESULT" = "success"
           test "$MIGRATIONS_RESULT" = "success"
+
+  publish:
+    name: Publish production image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [required]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+    steps:
+      - name: Validate deployment bot configuration
+        env:
+          APP_CLIENT_ID: ${{ vars.MAGI_DEPLOY_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.MAGI_DEPLOY_APP_PRIVATE_KEY }}
+        run: |
+          test -n "$APP_CLIENT_ID"
+          test -n "$APP_PRIVATE_KEY"
+      - name: Generate deployment bot token
+        id: deploy-bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.MAGI_DEPLOY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MAGI_DEPLOY_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.deploy-bot.outputs.token }}
+      - name: Validate publish configuration
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+        run: |
+          test -n "$AWS_REGION"
+          test -n "$ECR_REPOSITORY"
+          test -n "$AWS_ROLE_ARN"
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2.1.6
+      - name: Build and push immutable image
+        id: build
+        uses: docker/build-push-action@v7.2.0
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:sha-${{ github.sha }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+      - name: Record deployable image identity
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          IMAGE_TAG="$REGISTRY/$ECR_REPOSITORY:sha-$GITHUB_SHA"
+          IMAGE_REF="$REGISTRY/$ECR_REPOSITORY@$DIGEST"
+          jq -n \
+            --arg repository "$REGISTRY/$ECR_REPOSITORY" \
+            --arg tag "$IMAGE_TAG" \
+            --arg digest "$DIGEST" \
+            --arg image "$IMAGE_REF" \
+            --arg git_sha "$GITHUB_SHA" \
+            '{repository: $repository, tag: $tag, digest: $digest, image: $image, git_sha: $git_sha}' \
+            > image-metadata.json
+          {
+            echo "### Production image"
+            echo '```text'
+            echo "$IMAGE_REF"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload immutable image metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-metadata-${{ github.sha }}
+          path: image-metadata.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Pin stage image digest in repository
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          echo "MAGI_IMAGE=$REGISTRY/$ECR_REPOSITORY@$DIGEST" > deploy/stage.env
+          git add deploy/stage.env
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(deploy): pin stage image for $GITHUB_SHA [skip ci]"
+          git push origin HEAD:main

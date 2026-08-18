@@ -152,11 +152,7 @@ async def capture_baseline(
     qdrant_settings: QdrantSettings,
     git_revision: str,
 ) -> Mapping[str, object]:
-    qdrant_headers = (
-        {"api-key": qdrant_settings.api_key.get_secret_value()}
-        if qdrant_settings.api_key is not None
-        else None
-    )
+    qdrant_headers = {"api-key": qdrant_settings.api_key.get_secret_value()}
     async with (
         TeiEmbeddingProvider(_embedding_config(embedding_settings)) as embedding_provider,
         httpx.AsyncClient(
