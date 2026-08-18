@@ -36,7 +36,7 @@ jobs:
           else
             git diff --name-only "$BASE_SHA" "$GITHUB_SHA" > changed-files.txt
           fi
-          if grep -Eq '^(src/|pyproject\.toml$|uv\.lock$|Dockerfile$|\.dockerignore$|alembic\.ini$|README\.md$)' changed-files.txt; then
+          if grep -Eq '^(src/|pyproject\.toml$|uv\.lock$|Dockerfile$|\.dockerignore$|alembic\.ini$)' changed-files.txt; then
             echo "image=true" >> "$GITHUB_OUTPUT"
           else
             echo "image=false" >> "$GITHUB_OUTPUT"
