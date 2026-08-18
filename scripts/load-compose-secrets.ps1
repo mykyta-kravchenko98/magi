@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$secretString = aws secretsmanager get-secret-value `
+$secretOutput = aws secretsmanager get-secret-value `
     --secret-id $SecretId `
     --region $Region `
     --query SecretString `
@@ -17,7 +17,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "Failed to read AWS Secrets Manager secret '$SecretId'."
 }
 
+$secretString = $secretOutput -join [Environment]::NewLine
 $secret = $secretString | ConvertFrom-Json
+if ($secret -is [array]) {
+    if ($secret.Count -ne 1) {
+        throw "Secrets Manager value must be a JSON object or a one-element array."
+    }
+    $secret = $secret[0]
+}
 $requiredNames = @(
     "MAGI_POSTGRES_PASSWORD",
     "MAGI_OBJECT_STORAGE_ACCESS_KEY",
