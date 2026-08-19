@@ -1,0 +1,208 @@
+name: Release image
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing Git release tag to publish, for example v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-image-${{ inputs.release_tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish versioned image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      REQUESTED_TAG: ${{ inputs.release_tag || github.ref_name }}
+    steps:
+      - name: Validate publish configuration
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+        shell: bash
+        run: |
+          test -n "$AWS_REGION"
+          test -n "$ECR_REPOSITORY"
+          test -n "$AWS_ROLE_ARN"
+          if [[ ! "$REQUESTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must use stable SemVer form vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
+
+      - name: Check out release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.REQUESTED_TAG }}
+          fetch-depth: 0
+
+      - name: Resolve and verify release identity
+        id: release
+        shell: bash
+        run: |
+          git show-ref --verify --quiet "refs/tags/$REQUESTED_TAG"
+          TAG_SHA="$(git rev-list -n 1 "$REQUESTED_TAG")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          if [[ "$TAG_SHA" != "$HEAD_SHA" ]]; then
+            echo "Checked-out commit $HEAD_SHA does not match $REQUESTED_TAG commit $TAG_SHA" >&2
+            exit 1
+          fi
+          {
+            echo "tag=$REQUESTED_TAG"
+            echo "sha=$HEAD_SHA"
+            echo "sha_tag=sha-$HEAD_SHA"
+            echo "build_date=$(git show -s --format=%cI HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2.1.6
+
+      - name: Inspect existing image tags
+        id: lookup
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          SHA_TAG: ${{ steps.release.outputs.sha_tag }}
+        shell: bash
+        run: |
+          lookup_digest() {
+            local tag="$1"
+            aws ecr describe-images \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-ids "imageTag=$tag" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text 2>/dev/null
+          }
+
+          RELEASE_DIGEST="$(lookup_digest "$RELEASE_TAG" || true)"
+          SHA_DIGEST="$(lookup_digest "$SHA_TAG" || true)"
+          [[ "$RELEASE_DIGEST" == "None" ]] && RELEASE_DIGEST=""
+          [[ "$SHA_DIGEST" == "None" ]] && SHA_DIGEST=""
+
+          if [[ -n "$RELEASE_DIGEST" && -n "$SHA_DIGEST" ]]; then
+            if [[ "$RELEASE_DIGEST" != "$SHA_DIGEST" ]]; then
+              echo "$RELEASE_TAG and $SHA_TAG point to different image digests" >&2
+              exit 1
+            fi
+            MODE="existing"
+          elif [[ -n "$RELEASE_DIGEST" ]]; then
+            echo "$RELEASE_TAG exists but the expected immutable tag $SHA_TAG is missing" >&2
+            exit 1
+          elif [[ -n "$SHA_DIGEST" ]]; then
+            MODE="retag"
+          else
+            MODE="build"
+          fi
+
+          {
+            echo "mode=$MODE"
+            echo "release_digest=$RELEASE_DIGEST"
+            echo "sha_digest=$SHA_DIGEST"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attach release tag to existing immutable image
+        if: steps.lookup.outputs.mode == 'retag'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          SHA_TAG: ${{ steps.release.outputs.sha_tag }}
+        shell: bash
+        run: |
+          aws ecr batch-get-image \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$SHA_TAG" \
+            --accepted-media-types \
+              application/vnd.oci.image.index.v1+json \
+              application/vnd.docker.distribution.manifest.list.v2+json \
+              application/vnd.docker.distribution.manifest.v2+json \
+            --query 'images[0].imageManifest' \
+            --output text > image-manifest.json
+          test -s image-manifest.json
+          test "$(cat image-manifest.json)" != "None"
+          aws ecr put-image \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-tag "$RELEASE_TAG" \
+            --image-manifest file://image-manifest.json \
+            >/dev/null
+
+      - name: Set up Docker Buildx
+        if: steps.lookup.outputs.mode == 'build'
+        uses: docker/setup-buildx-action@v4.2.0
+
+      - name: Build and push missing release image
+        if: steps.lookup.outputs.mode == 'build'
+        uses: docker/build-push-action@v7.2.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.release.outputs.tag }}
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.release.outputs.sha_tag }}
+          build-args: |
+            VCS_REF=${{ steps.release.outputs.sha }}
+            BUILD_DATE=${{ steps.release.outputs.build_date }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Verify published release identity
+        id: verify
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          SHA_TAG: ${{ steps.release.outputs.sha_tag }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        shell: bash
+        run: |
+          RELEASE_DIGEST="$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$RELEASE_TAG" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+          SHA_DIGEST="$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$SHA_TAG" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+          if [[ -z "$RELEASE_DIGEST" || "$RELEASE_DIGEST" == "None" ]]; then
+            echo "Release image was not published" >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_DIGEST" != "$SHA_DIGEST" ]]; then
+            echo "$RELEASE_TAG and $SHA_TAG do not resolve to the same digest" >&2
+            exit 1
+          fi
+
+          IMAGE_REF="$REGISTRY/$ECR_REPOSITORY@$RELEASE_DIGEST"
+          {
+            echo "digest=$RELEASE_DIGEST"
+            echo "image=$IMAGE_REF"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release image"
+            echo
+            echo "- Git tag: \`$RELEASE_TAG\`"
+            echo "- Git commit: \`${{ steps.release.outputs.sha }}\`"
+            echo "- Docker tags: \`$RELEASE_TAG\`, \`$SHA_TAG\`"
+            echo "- Image: \`$IMAGE_REF\`"
+            echo "- Publish mode: \`${{ steps.lookup.outputs.mode }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
