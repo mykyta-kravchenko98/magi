@@ -3,7 +3,10 @@
 from magi.documents.domain import (
     ProcessingErrorCode,
     ProcessingFailure,
+    RejectionCode,
+    RejectionOutcome,
     SearchProjection,
+    SourceFingerprint,
 )
 
 
@@ -20,6 +23,21 @@ def failure_from_columns(
             raise PersistenceMappingError("failure_message exists without failure_code")
         return None
     return ProcessingFailure(code=code, message=message)
+
+
+def source_fingerprint_from_columns(
+    algorithm: str | None,
+    digest: str | None,
+) -> SourceFingerprint | None:
+    if algorithm is None and digest is None:
+        return None
+    if algorithm is None or digest is None:
+        raise PersistenceMappingError("source fingerprint columns are incomplete")
+    return SourceFingerprint(algorithm=algorithm, digest=digest)
+
+
+def rejection_from_column(code: RejectionCode | None) -> RejectionOutcome | None:
+    return RejectionOutcome(code=code) if code is not None else None
 
 
 def projection_from_columns(

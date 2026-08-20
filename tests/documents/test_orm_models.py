@@ -24,8 +24,11 @@ def test_value_objects_are_flattened_into_aggregate_tables() -> None:
         "original_filename",
         "media_type",
         "size_bytes",
+        "source_fingerprint_algorithm",
+        "source_fingerprint_digest",
         "failure_code",
         "failure_message",
+        "rejection_code",
     }
     assert set(DocumentVersionRow.__table__.columns.keys()) >= {
         "projection_reference",
@@ -65,6 +68,8 @@ def test_stateful_tables_have_database_invariant_constraints() -> None:
 
     assert "ck_document_additions_size_bytes_positive" in addition_checks
     assert "ck_document_additions_state_is_consistent" in addition_checks
+    assert "ck_document_additions_source_fingerprint_is_consistent" in addition_checks
+    assert "ck_document_additions_document_addition_rejection_code" in addition_checks
     assert "ck_document_versions_state_is_consistent" in version_checks
 
 

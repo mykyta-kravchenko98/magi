@@ -13,6 +13,7 @@ from magi.documents.domain import (
     DocumentVersionStatus,
     SearchProjection,
     SourceFileMetadata,
+    SourceFingerprint,
 )
 from magi.documents.infrastructure.persistence.models import (
     DocumentAdditionRow,
@@ -52,6 +53,10 @@ async def test_documents_repository_round_trip() -> None:
                     original_filename="architecture.md",
                     media_type="text/markdown",
                     size_bytes=256,
+                ),
+                source_fingerprint=SourceFingerprint(
+                    algorithm="sha256",
+                    digest="c" * 64,
                 ),
             )
             await unit_of_work.document_additions.add(addition)
@@ -99,6 +104,10 @@ async def test_documents_repository_round_trip() -> None:
         assert restored_addition is not None
         assert restored_addition.status is DocumentAdditionStatus.COMPLETED
         assert restored_addition.document_id == document_id
+        assert restored_addition.source_fingerprint == SourceFingerprint(
+            algorithm="sha256",
+            digest="c" * 64,
+        )
         assert restored_version is not None
         assert restored_version.status is DocumentVersionStatus.SEARCHABLE
         assert restored_version.projection == SearchProjection(

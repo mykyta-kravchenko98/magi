@@ -37,3 +37,22 @@ def test_documents_domain_and_application_do_not_import_infrastructure_framework
     }
 
     assert not {path: modules for path, modules in violations.items() if modules}
+
+
+def test_documents_domain_does_not_implement_hashing_or_depend_on_boundaries() -> None:
+    domain_files = DOCUMENTS_SOURCE.joinpath("domain").rglob("*.py")
+    forbidden_prefixes = (
+        "fastapi",
+        "hashlib",
+        "sqlalchemy",
+        "magi.documents.infrastructure",
+    )
+
+    violations = {
+        str(path.relative_to(DOCUMENTS_SOURCE)): sorted(
+            module for module in imported_modules(path) if module.startswith(forbidden_prefixes)
+        )
+        for path in domain_files
+    }
+
+    assert not {path: modules for path, modules in violations.items() if modules}

@@ -8,8 +8,11 @@ from magi.documents.domain.knowledge_base import KnowledgeBase, KnowledgeBaseSta
 from magi.documents.domain.value_objects import (
     ProcessingErrorCode,
     ProcessingFailure,
+    RejectionCode,
+    RejectionOutcome,
     SearchProjection,
     SourceFileMetadata,
+    SourceFingerprint,
 )
 
 __all__ = [
@@ -25,6 +28,9 @@ __all__ = [
     "KnowledgeBaseStatus",
     "ProcessingErrorCode",
     "ProcessingFailure",
+    "RejectionCode",
+    "RejectionOutcome",
     "SearchProjection",
     "SourceFileMetadata",
+    "SourceFingerprint",
 ]

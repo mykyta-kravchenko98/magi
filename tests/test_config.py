@@ -75,7 +75,7 @@ def test_production_requires_explicit_credentials(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("MAGI_DOCS_ENABLED", "false")
 
     with pytest.raises(ValidationError, match="production requires explicit settings"):
-        Settings()
+        Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
 
 
 def test_production_disables_api_docs(monkeypatch: pytest.MonkeyPatch) -> None:

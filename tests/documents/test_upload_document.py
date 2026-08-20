@@ -200,6 +200,13 @@ async def test_upload_completes_only_after_searchable_projection() -> None:
     assert result.document_version_status is DocumentVersionStatus.SEARCHABLE
     assert result.indexed_chunk_count == 1
     assert result.failure is None
+    addition = store.additions[result.document_addition_id]
+    assert addition.source_fingerprint is not None
+    assert addition.source_fingerprint.algorithm == "sha256"
+    assert (
+        addition.source_fingerprint.digest
+        == "5d53fe66ec3582fa4589c944502204b25f239415cf6b5b5fc325470f7cea8af8"
+    )
     assert indexer.received[0].heading_path == ("Architecture",)
     assert indexer.received[0].vector == (1.0, 2.0, 3.0)
     assert store.commits == 4

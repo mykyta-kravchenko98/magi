@@ -2,6 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import PurePosixPath
 from uuid import UUID, uuid4
 
@@ -24,6 +25,7 @@ from magi.documents.domain import (
     ProcessingFailure,
     SearchProjection,
     SourceFileMetadata,
+    SourceFingerprint,
 )
 from magi.ingestion.application import (
     DocumentContentProcessor,
@@ -63,12 +65,17 @@ class UploadDocumentHandler:
 
     async def handle(self, command: UploadDocumentCommand) -> DocumentAdditionView:
         upload = self._upload_validator.validate(command)
+        source_fingerprint = SourceFingerprint(
+            algorithm="sha256",
+            digest=sha256(command.content).hexdigest(),
+        )
         addition_id = uuid4()
         await self._accept_addition(
             addition_id=addition_id,
             command=command,
             filename=upload.filename,
             media_type=upload.media_type,
+            source_fingerprint=source_fingerprint,
         )
 
         version_id: UUID | None = None
@@ -141,6 +148,7 @@ class UploadDocumentHandler:
         command: UploadDocumentCommand,
         filename: str,
         media_type: str,
+        source_fingerprint: SourceFingerprint,
     ) -> None:
         async with self._unit_of_work_factory() as unit_of_work:
             knowledge_base = await unit_of_work.knowledge_bases.get(command.knowledge_base_id)
@@ -161,6 +169,7 @@ class UploadDocumentHandler:
                         media_type=media_type,
                         size_bytes=len(command.content),
                     ),
+                    source_fingerprint=source_fingerprint,
                 )
             )
             await unit_of_work.commit()
